@@ -12,7 +12,15 @@ export function VerdictBadge({ verdict }: { verdict: Verdict }) {
   return <span className={`verdict verdict--${verdict}`}>{VERDICT_LABEL[verdict]}</span>;
 }
 
-export function ClaimCard({ claim, repo }: { claim: CheckedClaim; repo: RepoRef }) {
+export function ClaimCard({
+  claim,
+  repo,
+  nextLabel = "Say this instead",
+}: {
+  claim: CheckedClaim;
+  repo: RepoRef;
+  nextLabel?: string;
+}) {
   return (
     <li className="claim">
       <div className="claim__top">
@@ -44,7 +52,7 @@ export function ClaimCard({ claim, repo }: { claim: CheckedClaim; repo: RepoRef 
       )}
       {claim.sayInstead && (
         <p className="claim__instead">
-          <b>Say this instead</b>
+          <b>{nextLabel}</b>
           {claim.sayInstead}
         </p>
       )}

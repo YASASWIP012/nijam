@@ -1,4 +1,4 @@
-import { byReadingOrder, skipReason, type Snapshot } from "./snapshot";
+import { byReadingOrder, classify, skipReason, type Snapshot } from "./snapshot";
 import type { RepoRef } from "./types";
 
 const MAX_FILE_BYTES = 200_000;
@@ -58,15 +58,18 @@ export async function loadRepo(url: string): Promise<{ repo: RepoRef; snapshot: 
   const blobs = tree.tree.filter((item) => item.type === "blob");
   const skipped: Record<string, number> = {};
   const wanted: { path: string; size: number }[] = [];
+  let sourceTooBig = false;
   for (const blob of blobs) {
     const size = blob.size ?? 0;
     const reason = skipReason(blob.path, size, MAX_FILE_BYTES);
-    if (reason) skipped[reason] = (skipped[reason] ?? 0) + 1;
-    else wanted.push({ path: blob.path, size });
+    if (reason) {
+      skipped[reason] = (skipped[reason] ?? 0) + 1;
+      if (reason === "over file size cap" && classify(blob.path) === "source") sourceTooBig = true;
+    } else wanted.push({ path: blob.path, size });
   }
 
   let budget = MAX_TOTAL_BYTES;
-  let complete = !tree.truncated;
+  let complete = !tree.truncated && !sourceTooBig;
   const toRead: typeof wanted = [];
   for (const file of byReadingOrder(wanted)) {
     if (file.size > budget) {

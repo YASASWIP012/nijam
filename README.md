@@ -6,6 +6,8 @@ You paste a public GitHub link and pitch the project out loud, the way you would
 
 I built it because solo hackathon work ends with claims I have to check by hand before I submit. Spoken claims are the ones that reach judges, so that is what it checks.
 
+It has two modes. My pitch checks what you say about the project. What I told my tools checks the instructions you dictated to a coding tool, and tells you what to say next for anything that did not get built. `public/history.mjs` pulls those instructions from your local Wispr Flow history. It is read-only and sends nothing anywhere. Flow's history file is undocumented, so an update can break it.
+
 ## Verdicts
 
 | Verdict | Meaning |
@@ -20,16 +22,18 @@ A language model reads the code and proposes a verdict. Code in `src/lib/gate.ts
 - A claim is dropped unless its words appear in the pitch.
 - A citation counts only if the quoted lines exist in that file at that commit.
 - Backed by code needs source lines. READMEs and tests are not enough.
-- Not in the repo is refused when any source file went unread.
-- Stated test counts are compared with a count taken from the code, with no model involved.
+- Comments and imports do not count as code.
+- Not in the repo is refused when any source file went unread, or when a repo-wide search finds the claim's words.
+- Stated test counts are compared with a count taken from the code, with no model involved. Skipped and commented-out tests are left out.
+- The first report for a commit and text stands, so rerunning cannot improve a verdict.
 
 When the gate overrules the model, the report says so.
 
-Each report also gives you a `WHAT-IS-REAL.md`, an honest rewrite of the pitch, and a SHA-256 receipt over the commit, the pitch and the verdicts. The browser can recompute that receipt.
+Each report also gives you a `WHAT-IS-REAL.md`, an honest rewrite of the pitch, and a receipt: a SHA-256 hash over the commit, the text and the verdicts, signed with Ed25519. The browser can check both. The signature shows Nijam issued the report, and it does not make the verdicts true.
 
 ## Limits
 
-Nijam reads code and does not run it. It cannot prove that something is deployed or that a number was measured, and code it marks as backed can still have bugs. Pitches and repo excerpts go to a third-party language model, so it only accepts public repos.
+Nijam reads code and does not run it. It cannot prove that something is deployed or that a number was measured. The gate confirms a quote exists, and it cannot confirm the model read it correctly or that the code is ever called, so dead code can pass. Pitches and repo excerpts go to a third-party language model, so it only accepts public repos.
 
 ## Run it
 
@@ -39,4 +43,4 @@ npm test
 npm run dev
 ```
 
-Set `LLM_API_KEY`, `LLM_MODEL` and `GITHUB_TOKEN` in `.env.local`. `npm run eval` scores the checker on a planted repo with hand-labelled answers in `eval/labelled.ts`.
+Set `LLM_API_KEY`, `LLM_MODEL`, `GITHUB_TOKEN` and `RECEIPT_KEY` in `.env.local`. `npm run eval` scores the checker on a planted repo with hand-labelled answers in `eval/labelled.ts`.

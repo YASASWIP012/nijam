@@ -50,10 +50,13 @@ export function byReadingOrder<T extends { path: string }>(items: T[]): T[] {
 
 export function countTestCases(path: string, text: string): number {
   if (classify(path) !== "test" && !/#\[test\]/.test(text)) return 0;
-  const js = text.match(/(^|[^\w.])(it|test)(\.\w+(\([^)]*\))?)*\(\s*['"`]/gm)?.length ?? 0;
-  const py = text.match(/^\s*(async\s+)?def\s+test_/gm)?.length ?? 0;
-  const rust = text.match(/#\[(tokio::)?test\]/g)?.length ?? 0;
-  const go = text.match(/^func\s+Test[A-Z]/gm)?.length ?? 0;
+  const live = text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*(\/\/|#(?!\[)).*$/gm, "");
+  const js = (live.match(/(^|[^\w.])(it|test)(\.\w+(\([^)]*\))?)*\(\s*['"`]/gm) ?? []).filter(
+    (call) => !/\.(skip|todo|fixme)\b/.test(call),
+  ).length;
+  const py = live.match(/^\s*(async\s+)?def\s+test_/gm)?.length ?? 0;
+  const rust = live.match(/#\[(tokio::)?test\](?!\s*#\[ignore)/g)?.length ?? 0;
+  const go = live.match(/^func\s+Test[A-Z]/gm)?.length ?? 0;
   return js + py + rust + go;
 }
 

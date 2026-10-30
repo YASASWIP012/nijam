@@ -7,7 +7,7 @@ import { CASES, PITCH, REPO } from "./labelled";
 
 const repo = { owner: "eval", name: "quickbill", sha: "0000000000000000" };
 let report: Report | null = null;
-for await (const event of run({ pitch: PITCH, llm: liveLlm(), load: async () => ({ repo, snapshot: snapshotFrom(REPO) }) })) {
+for await (const event of run({ pitch: PITCH, pitchSource: "planted", llm: liveLlm(), load: async () => ({ repo, snapshot: snapshotFrom(REPO) }) })) {
   if (event.type === "report") report = event.report;
 }
 if (!report) throw new Error("no report");

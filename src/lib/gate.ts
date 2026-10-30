@@ -1,8 +1,11 @@
+import { tokenize } from "./search";
 import { classify } from "./snapshot";
 import type { CheckedClaim, Citation, Claim, Coverage, RawVerdict, RepoFacts, Verdict } from "./types";
 
 const squash = (text: string) => text.replace(/\s+/g, " ").trim();
 const LINE_SLACK = 4;
+const COMMENT_LINE = /^\s*(\/\/|#(?![!\[])|\*|\/\*|--|"""|\'\'\'|<!--)/;
+const IMPORT_LINE = /^\s*(import\b|from\s+\S+\s+import\b|export\s+\*\s+from\b|(const|let|var)\s+.+=\s*require\(|use\s+[\w:]+|#include\b|package\b)/;
 const EDGE_PUNCTUATION = /^[\p{P}\p{S}]+|[\p{P}\p{S}]+$/gu;
 
 /**
@@ -25,6 +28,27 @@ export function confirmCitation(files: Map<string, string>, cited: Citation): Ci
     }
   }
   return null;
+}
+
+/** True when a quote has a line that does something: comments and imports prove nothing. */
+export function hasLiveCode(quote: string): boolean {
+  return quote.split("\n").some((line) => line.trim() !== "" && !COMMENT_LINE.test(line) && !IMPORT_LINE.test(line));
+}
+
+/**
+ * A repo-wide search for the claim's own words. If a source file holds most of them,
+ * something related exists, and "not in the repo" would overstate it.
+ */
+export function absenceHolds(claim: Claim, files: Map<string, string>): boolean {
+  const terms = [...new Set(claim.terms.flatMap(tokenize).filter((term) => term.length >= 4))];
+  if (terms.length === 0) return false;
+  const needed = terms.length === 1 ? 1 : Math.max(2, Math.ceil(terms.length * 0.6));
+  for (const [path, text] of files) {
+    if (classify(path) !== "source") continue;
+    const tokens = new Set(tokenize(text));
+    if (terms.filter((term) => tokens.has(term)).length >= needed) return false;
+  }
+  return true;
 }
 
 /** Finds the words in the pitch. A claim nobody said is dropped. */
@@ -70,14 +94,14 @@ export function applyGate(claim: Claim, raw: RawVerdict, ctx: GateContext): Chec
   const citations = raw.citations
     .map((cited) => confirmCitation(ctx.files, cited))
     .filter((cited): cited is Citation => cited !== null);
-  const inCode = citations.filter((cited) => classify(cited.path) === "source");
+  const inCode = citations.filter((cited) => classify(cited.path) === "source" && hasLiveCode(cited.quote));
 
   let verdict: Verdict = raw.verdict;
   let why: string | null = null;
   if (raw.verdict === "implemented" && inCode.length === 0) {
     verdict = "unclear";
     why = citations.length
-      ? "The only lines cited are in docs or tests, and a claim of working code needs code."
+      ? "The lines cited are docs, tests, comments or imports, and a claim of working code needs running code."
       : "No cited line exists in the repo at this commit.";
   } else if (raw.verdict === "simulated" && inCode.length === 0) {
     verdict = "unclear";
@@ -85,6 +109,9 @@ export function applyGate(claim: Claim, raw: RawVerdict, ctx: GateContext): Chec
   } else if (raw.verdict === "missing" && !ctx.coverage.complete) {
     verdict = "unclear";
     why = "Some source files were not read, so absence cannot be proven.";
+  } else if (raw.verdict === "missing" && !absenceHolds(claim, ctx.files)) {
+    verdict = "unclear";
+    why = "A search of the whole repo found source files using these words, so it may exist in another form.";
   }
 
   return {

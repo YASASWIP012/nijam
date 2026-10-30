@@ -5,13 +5,14 @@ import type { Report } from "./types";
 const path = (id: string) => `reports/${id}.json`;
 const enabled = () => Boolean(process.env.BLOB_READ_WRITE_TOKEN);
 
+/** First result stands: a report is never replaced, so rerunning cannot improve a verdict. */
 export async function saveReport(report: Report): Promise<string | null> {
   if (!enabled()) return null;
   await put(path(report.id), JSON.stringify(report), {
     access: "public",
     contentType: "application/json",
     addRandomSuffix: false,
-    allowOverwrite: true,
+    allowOverwrite: false,
   });
   return `/r/${report.id}`;
 }

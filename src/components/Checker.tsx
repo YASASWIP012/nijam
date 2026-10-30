@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { honestPitch } from "@/lib/report";
 import type { CheckedClaim, Claim, RepoRef, Report, RunEvent } from "@/lib/types";
+import { SAMPLES } from "@/data/samples";
 import { ClaimCard } from "./ClaimCard";
 import { ReportView } from "./ReportView";
 
@@ -14,6 +15,7 @@ const STAGES = [
 ] as const;
 
 export function Checker() {
+  const [mode, setMode] = useState<"spoken" | "instructions">("spoken");
   const [repo, setRepo] = useState("");
   const [pitch, setPitch] = useState("");
   const [stage, setStage] = useState<string | null>(null);
@@ -59,7 +61,7 @@ export function Checker() {
       const res = await fetch("/api/check", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ repo, pitch }),
+        body: JSON.stringify({ repo, pitch, mode }),
       });
       if (!res.ok || !res.body) {
         const body = (await res.json().catch(() => null)) as { message?: string } | null;
@@ -81,6 +83,13 @@ export function Checker() {
     }
   }
 
+  function loadExample() {
+    const sample = SAMPLES[0];
+    if (!sample) return;
+    setRepo(`github.com/${sample.repo.owner}/${sample.repo.name}`);
+    setPitch(sample.pitch);
+  }
+
   function sayItAgain() {
     if (report) setPitch(honestPitch(report));
     setStage(null);
@@ -91,6 +100,14 @@ export function Checker() {
   return (
     <div className="tool" id="check">
       <form className="tool__card" onSubmit={check}>
+        <div className="segmented" role="group" aria-label="What to check" style={{ marginBottom: 18 }}>
+          <button type="button" aria-pressed={mode === "spoken"} onClick={() => setMode("spoken")}>
+            My pitch
+          </button>
+          <button type="button" aria-pressed={mode === "instructions"} onClick={() => setMode("instructions")}>
+            What I told my tools
+          </button>
+        </div>
         <label className="field">
           <span className="field__label">Public GitHub repo</span>
           <input
@@ -105,7 +122,7 @@ export function Checker() {
         </label>
         <label className="field">
           <span className="field__label">
-            Explain it out loud
+            {mode === "spoken" ? "Explain it out loud" : "Your dictated instructions"}
             <span className="field__hint">English, हिन्दी or తెలుగు</span>
           </span>
           <textarea
@@ -113,12 +130,26 @@ export function Checker() {
             className="voice"
             value={pitch}
             onChange={(event) => setPitch(event.target.value)}
-            placeholder="Click here, hold your Wispr Flow key and pitch the project as you would to a judge. What does it do? What is real? What numbers would you quote?"
+            placeholder={
+              mode === "spoken"
+                ? "Click here, hold your Wispr Flow key and pitch the project as you would to a judge. What does it do? What is real? What numbers would you quote?"
+                : "Paste what you dictated to your coding tools, or say what you asked them to build. Nijam checks each instruction against the repo."
+            }
             required
           />
         </label>
         <div className="tool__foot">
-          <span className="status">{words > 0 ? `${words} words` : "No key to hold? Your phone's keyboard mic works too."}</span>
+          <span className="status">
+            {words > 0 ? `${words} words` : "No Flow? Your phone's keyboard mic works too."}
+            {words === 0 && SAMPLES[0] && (
+              <>
+                {" "}
+                <button type="button" className="linklike" onClick={loadExample}>
+                  Load an example
+                </button>
+              </>
+            )}
+          </span>
           <button className="btn btn-candy" type="submit" disabled={busy}>
             {busy ? "Checking" : "Check my claims"}
           </button>
@@ -141,9 +172,11 @@ export function Checker() {
         {report ? (
           <>
             <ReportView report={report} />
-            <button className="btn btn-ink" style={{ marginTop: 20 }} onClick={sayItAgain}>
-              Say it again, honestly
-            </button>
+            {mode === "spoken" && (
+              <button className="btn btn-ink" style={{ marginTop: 20 }} onClick={sayItAgain}>
+                Say it again, honestly
+              </button>
+            )}
           </>
         ) : (
           checkedRepo &&

@@ -65,6 +65,11 @@ describe("countTestCases", () => {
     expect(countTestCases("src/lib.rs", "#[test]\nfn a() {}\n#[tokio::test]\nasync fn b() {}")).toBe(2);
     expect(countTestCases("x_test.go", "func TestA(t *testing.T) {}")).toBe(1);
   });
+
+  it("leaves out skipped and commented-out tests", () => {
+    const text = "it('real', f);\nit.skip('off', f);\ntest.todo('later');\n// it('old', f);\n/* it('older', f); */";
+    expect(countTestCases("a.test.ts", text)).toBe(1);
+  });
 });
 
 describe("parseRepoUrl", () => {

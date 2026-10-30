@@ -53,6 +53,37 @@ export default function Home() {
       )}
 
       <section className="section">
+        <div className="container split split--flip">
+          <div>
+            <span className="eyebrow">What I told my tools</span>
+            <h3 style={{ marginTop: 14 }}>You asked for it out loud. Did it get built?</h3>
+            <p className="lead">
+              If you build by talking to a coding tool, your Flow history already holds every instruction you gave. Nijam
+              checks them against the repo and tells you what to say next.
+            </p>
+          </div>
+          <div className="window window--dark">
+            <div className="window__bar">
+              <span className="lights">
+                <i />
+                <i />
+                <i />
+              </span>
+              <span className="window__title">Terminal</span>
+            </div>
+            <pre className="terminal">
+              {`curl -O https://nijam-xi.vercel.app/history.mjs
+node history.mjs --days 2`}
+            </pre>
+            <p className="terminal__note">
+              Read-only and local. It prints your coding dictations and sends nothing anywhere. Flow's history file is
+              undocumented, so an update can break it.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="section section--alt">
         <div className="container split">
           <div>
             <span className="eyebrow">Why voice</span>
@@ -68,7 +99,7 @@ export default function Home() {
               <li>A verdict for each claim, with the lines behind it</li>
               <li>A rewrite for anything the code does not support</li>
               <li>A WHAT-IS-REAL.md you can commit</li>
-              <li>A receipt tied to one commit</li>
+              <li>A signed receipt tied to one commit</li>
             </ul>
             <a className="btn btn-outline btn-sm" href="/how">
               How it decides

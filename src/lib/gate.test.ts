@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyGate, checkTestCount, confirmCitation, locateSaid } from "./gate";
+import { absenceHolds, applyGate, checkTestCount, confirmCitation, hasLiveCode, locateSaid } from "./gate";
 import type { Claim, Coverage, RawVerdict } from "./types";
 
 const files = new Map([
@@ -98,8 +98,25 @@ describe("applyGate", () => {
     expect(result.verdict).toBe("unclear");
   });
 
+  it("does not accept a comment or an import as proof", () => {
+    const code = new Map([["src/a.ts", "// charges the card through stripe\nimport { Stripe } from 'stripe';\n"]]);
+    const cite = (startLine: number, quote: string) => ({ path: "src/a.ts", startLine, endLine: startLine, quote });
+    const check = (quote: string, line: number) =>
+      applyGate(claim, raw({ citations: [cite(line, quote)] }), { files: code, coverage: complete }).verdict;
+    expect(check("// charges the card through stripe", 1)).toBe("unclear");
+    expect(check("import { Stripe } from 'stripe';", 2)).toBe("unclear");
+  });
+
+  it("refuses missing when a repo-wide search finds the words", () => {
+    const related: Claim = { ...claim, terms: ["charges", "create", "stripe"] };
+    const result = applyGate(related, raw({ verdict: "missing" }), ctx);
+    expect(result.verdict).toBe("unclear");
+    expect(result.overruled?.from).toBe("missing");
+  });
+
   it("allows missing only when every file was read", () => {
-    expect(applyGate(claim, raw({ verdict: "missing" }), ctx).verdict).toBe("missing");
+    const absent: Claim = { ...claim, terms: ["whatsapp", "reminder"] };
+    expect(applyGate(absent, raw({ verdict: "missing" }), ctx).verdict).toBe("missing");
     expect(applyGate(claim, raw({ verdict: "missing" }), { files, coverage: partial }).verdict).toBe("unclear");
   });
 
@@ -110,6 +127,23 @@ describe("applyGate", () => {
   it("drops the rewrite for an implemented claim", () => {
     const result = applyGate(claim, raw({ citations: [realCode], sayInstead: "unused" }), ctx);
     expect(result.sayInstead).toBeUndefined();
+  });
+});
+
+describe("hasLiveCode", () => {
+  it("separates code from comments and imports", () => {
+    expect(hasLiveCode("return charge(card);")).toBe(true);
+    expect(hasLiveCode("// return charge(card);")).toBe(false);
+    expect(hasLiveCode("# python comment")).toBe(false);
+    expect(hasLiveCode("#[derive(Debug)]")).toBe(true);
+    expect(hasLiveCode("from os import path")).toBe(false);
+    expect(hasLiveCode("// note\nreturn 1;")).toBe(true);
+  });
+});
+
+describe("absenceHolds", () => {
+  it("needs terms to search for", () => {
+    expect(absenceHolds({ ...claim, terms: [] }, files)).toBe(false);
   });
 });
 

@@ -79,18 +79,24 @@ export interface RepoRef {
   sha: string;
 }
 
+export type PitchSource = "spoken" | "instructions" | "readme" | "planted";
+
 export interface Report {
   id: string;
   repo: RepoRef;
   pitch: string;
+  pitchSource: PitchSource;
   createdAt: string;
   coverage: Coverage;
   facts: RepoFacts;
   claims: CheckedClaim[];
+  /** Claims left out of the verdicts, shown on the report so nothing vanishes silently. */
+  dropped: { notInPitch: number; overCap: number };
   counts: Record<Verdict, number>;
   /** SHA-256 over commit, pitch and every verdict. Changes if any of them change. */
   receipt: string;
-  sample?: boolean;
+  /** Ed25519 signature over the receipt, made by the Nijam server. */
+  signature?: string;
 }
 
 export type RunEvent =

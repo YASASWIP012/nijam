@@ -46,7 +46,7 @@ function scripted(): Llm {
 
 async function collect(): Promise<{ events: RunEvent[]; report: Report }> {
   const events: RunEvent[] = [];
-  for await (const event of run({ pitch, llm: scripted(), load: async () => ({ repo, snapshot }) })) events.push(event);
+  for await (const event of run({ pitch, pitchSource: "spoken", llm: scripted(), load: async () => ({ repo, snapshot }) })) events.push(event);
   const last = events.at(-1);
   if (last?.type !== "report") throw new Error("no report");
   return { events, report: last.report };
@@ -56,6 +56,33 @@ describe("run", () => {
   it("drops claims the speaker never said", async () => {
     const { report } = await collect();
     expect(report.claims.map((claim) => claim.said)).not.toContain("a sentence nobody spoke at all");
+  });
+
+  it("shows how many claims were left out", async () => {
+    const { report } = await collect();
+    expect(report.dropped).toEqual({ notInPitch: 1, overCap: 0 });
+  });
+
+  it("returns the first report instead of redoing a check", async () => {
+    const { report } = await collect();
+    const events: RunEvent[] = [];
+    const again = run({
+      pitch,
+      pitchSource: "spoken",
+      llm: { json: () => Promise.reject(new Error("should not run")) },
+      load: async () => ({ repo, snapshot }),
+      find: async () => report,
+    });
+    for await (const event of again) events.push(event);
+    expect(events.at(-1)).toMatchObject({ type: "report", report: { receipt: report.receipt } });
+  });
+
+  it("refuses to make an empty report", async () => {
+    const empty: Llm = { json: async ({ schema }) => schema.parse({ claims: [] }) };
+    const events = run({ pitch, pitchSource: "spoken", llm: empty, load: async () => ({ repo, snapshot }) });
+    await expect(async () => {
+      for await (const _ of events) void _;
+    }).rejects.toThrow("No checkable claims");
   });
 
   it("overrules a model that invents evidence", async () => {

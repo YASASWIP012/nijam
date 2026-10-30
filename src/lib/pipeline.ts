@@ -1,37 +1,60 @@
 import { applyGate, checkTestCount, locateSaid } from "./gate";
-import type { Llm } from "./llm";
-import { EXTRACT_SYSTEM, extractUser, VERIFY_SYSTEM, verifyUser } from "./prompts";
+import { LlmError, type Llm } from "./llm";
+import { EXTRACT_SYSTEM, extractUser, INSTRUCTIONS_NOTE, VERIFY_SYSTEM, verifyUser } from "./prompts";
 import { countVerdicts, receiptInput, sha256 } from "./report";
 import { RepoIndex, signalsIn, type Chunk } from "./search";
 import { factsOf, type Snapshot } from "./snapshot";
-import { ExtractedClaims, RawVerdict, type CheckedClaim, type Claim, type RepoRef, type Report, type RunEvent } from "./types";
+import {
+  ExtractedClaims,
+  RawVerdict,
+  type CheckedClaim,
+  type Claim,
+  type PitchSource,
+  type RepoRef,
+  type Report,
+  type RunEvent,
+} from "./types";
 
 const MAX_CLAIMS = 10;
+const MAX_INSTRUCTIONS = 20;
 const CHUNKS_PER_CLAIM = 12;
 const CONCURRENCY = 4;
 
 export interface RunInput {
   pitch: string;
+  pitchSource: PitchSource;
   load: () => Promise<{ repo: RepoRef; snapshot: Snapshot }>;
   llm: Llm;
+  /** Returns the first report for this commit and pitch. Results are never redone or replaced. */
+  find?: (id: string) => Promise<Report | null>;
+  sign?: (receipt: string) => string | undefined;
 }
 
 export async function reportId(repo: RepoRef, pitch: string): Promise<string> {
   return (await sha256(`${repo.owner}/${repo.name}@${repo.sha}\n${pitch}`)).slice(0, 14);
 }
 
-export async function extractClaims(pitch: string, llm: Llm): Promise<Claim[]> {
+export async function extractClaims(
+  pitch: string,
+  llm: Llm,
+  source: PitchSource = "spoken",
+): Promise<{ claims: Claim[]; dropped: Report["dropped"] }> {
+  const instructions = source === "instructions";
+  const cap = instructions ? MAX_INSTRUCTIONS : MAX_CLAIMS;
   const { claims } = await llm.json({
-    system: EXTRACT_SYSTEM,
+    system: instructions ? EXTRACT_SYSTEM + INSTRUCTIONS_NOTE : EXTRACT_SYSTEM,
     user: extractUser(pitch),
     schema: ExtractedClaims,
   });
   const kept: Claim[] = [];
+  const dropped = { notInPitch: 0, overCap: 0 };
   for (const claim of claims) {
     const said = locateSaid(pitch, claim.said);
-    if (said && kept.length < MAX_CLAIMS) kept.push({ ...claim, said, id: `c${kept.length + 1}` });
+    if (!said) dropped.notInPitch += 1;
+    else if (kept.length >= cap) dropped.overCap += 1;
+    else kept.push({ ...claim, said, id: `c${kept.length + 1}` });
   }
-  return kept;
+  return { claims: kept, dropped };
 }
 
 function evidenceFor(claim: Claim, index: RepoIndex): Chunk[] {
@@ -70,14 +93,22 @@ export async function checkClaim(
   return applyGate(claim, raw, { files: snapshot.files, coverage: snapshot.coverage });
 }
 
-export async function* run({ pitch, load, llm }: RunInput): AsyncGenerator<RunEvent> {
+export async function* run({ pitch, pitchSource, load, llm, find, sign }: RunInput): AsyncGenerator<RunEvent> {
   yield { type: "stage", stage: "repo" };
   const { repo, snapshot } = await load();
   const facts = factsOf(snapshot.files);
   yield { type: "repo", repo };
+  const id = await reportId(repo, pitch);
+  const earlier = await find?.(id);
+  if (earlier) {
+    yield { type: "stage", stage: "done" };
+    yield { type: "report", report: earlier, url: `/r/${id}` };
+    return;
+  }
   yield { type: "stage", stage: "claims", detail: `Read ${snapshot.coverage.readFiles} files at ${repo.sha.slice(0, 7)}` };
 
-  const claims = await extractClaims(pitch, llm);
+  const { claims, dropped } = await extractClaims(pitch, llm, pitchSource);
+  if (claims.length === 0) throw new LlmError("No checkable claims found. Say what the project does, in plain facts.");
   yield { type: "claims", claims };
   yield { type: "stage", stage: "checking" };
 
@@ -109,14 +140,18 @@ export async function* run({ pitch, load, llm }: RunInput): AsyncGenerator<RunEv
 
   const ordered = checked.filter((claim): claim is CheckedClaim => claim !== undefined);
   const base = { repo, pitch, claims: ordered };
+  const receipt = await sha256(receiptInput(base));
   const report: Report = {
     ...base,
-    id: await reportId(repo, pitch),
+    id,
+    pitchSource,
     createdAt: new Date().toISOString(),
     coverage: snapshot.coverage,
     facts,
+    dropped,
     counts: countVerdicts(ordered),
-    receipt: await sha256(receiptInput(base)),
+    receipt,
+    signature: sign?.(receipt),
   };
   yield { type: "stage", stage: "done" };
   yield { type: "report", report, url: null };

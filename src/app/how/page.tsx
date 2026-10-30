@@ -16,7 +16,10 @@ export default function How() {
           <li>A citation only counts if the quoted lines are in the file at that commit.</li>
           <li>Backed by code needs lines in a source file. READMEs and tests do not count.</li>
           <li>A measured number has to appear in the code cited. If it does not, the claim stays not settled, because code cannot show a number was measured.</li>
+          <li>A number is never marked as not in the repo. Reading code cannot show a number is false.</li>
           <li>Simulated also needs source lines, showing the fake path.</li>
+          <li>A claim is marked as only said out loud when most of its search terms are not in the README.</li>
+          <li>When you defend a claim, your answer tells the search where to look. It cannot settle the verdict, and every rule above still applies.</li>
           <li>Comments and imports do not count as code.</li>
           <li>Not in the repo needs every source file fetched and a repo-wide search for the claim's words to find nothing.</li>
           <li>The first report for a commit and pitch stands. Running it again returns the same report.</li>

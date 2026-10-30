@@ -12,6 +12,7 @@ const SOURCE_NOTE: Record<Report["pitchSource"], string> = {
 export function ReportView({ report }: { report: Report }) {
   const { repo, coverage, facts } = report;
   const skipped = Object.entries(coverage.skipped);
+  const saidOnly = report.claims.filter((claim) => claim.onlySaid).length;
   return (
     <>
       <span className="eyebrow">
@@ -26,7 +27,10 @@ export function ReportView({ report }: { report: Report }) {
         files. {facts.sourceFiles} source files, {facts.testCases} test cases.
         {!coverage.complete && " Some source files were not read, so nothing is marked as missing."}
       </p>
-      <p className="report__meta">{SOURCE_NOTE[report.pitchSource]}</p>
+      <p className="report__meta">
+        {SOURCE_NOTE[report.pitchSource]}
+        {saidOnly > 0 && ` ${saidOnly} of ${report.claims.length} claims appear only in what was said, not in the README.`}
+      </p>
       <div className="tally">
         {VERDICTS.map((verdict) => (
           <div key={verdict}>
@@ -43,6 +47,7 @@ export function ReportView({ report }: { report: Report }) {
             key={claim.id}
             claim={claim}
             repo={repo}
+            reportId={report.id}
             nextLabel={report.pitchSource === "instructions" ? "Tell your tool this next" : undefined}
           />
         ))}

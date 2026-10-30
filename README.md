@@ -43,4 +43,6 @@ npm test
 npm run dev
 ```
 
+After a report, each unsettled claim can be defended out loud in 20 seconds. The answer points the search at a file or function, and the same rules decide the verdict. The report itself does not change. Claims the README never makes are flagged as only said out loud.
+
 Set `LLM_PROVIDER`, `LLM_API_KEY`, `LLM_MODEL`, `GITHUB_TOKEN` and `RECEIPT_KEY` in `.env.local`. `LLM_PROVIDER=gemini` uses Gemini; any other value uses Anthropic. `npm run eval` scores the checker on a planted repo with hand-labelled answers in `eval/labelled.ts`.

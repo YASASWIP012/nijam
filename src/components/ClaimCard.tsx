@@ -1,5 +1,6 @@
 import { blobUrl } from "@/lib/github";
-import type { CheckedClaim, RepoRef, Verdict } from "@/lib/types";
+import type { Citation, CheckedClaim, RepoRef, Verdict } from "@/lib/types";
+import { Defend } from "./Defend";
 
 export const VERDICT_LABEL: Record<Verdict, string> = {
   implemented: "Backed by code",
@@ -12,13 +13,32 @@ export function VerdictBadge({ verdict }: { verdict: Verdict }) {
   return <span className={`verdict verdict--${verdict}`}>{VERDICT_LABEL[verdict]}</span>;
 }
 
+export function Cites({ citations, repo }: { citations: Citation[]; repo: RepoRef }) {
+  return (
+    <ul className="cites">
+      {citations.map((cite) => (
+        <li className="cite" key={`${cite.path}:${cite.startLine}`}>
+          <a href={blobUrl(repo, cite.path, cite.startLine, cite.endLine)} target="_blank" rel="noreferrer">
+            <span className="cite__path">
+              {cite.path}:{cite.startLine}
+            </span>
+            <code>{cite.quote}</code>
+          </a>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function ClaimCard({
   claim,
   repo,
+  reportId,
   nextLabel = "Say this instead",
 }: {
   claim: CheckedClaim;
   repo: RepoRef;
+  reportId?: string;
   nextLabel?: string;
 }) {
   return (
@@ -30,21 +50,9 @@ export function ClaimCard({
         </div>
         <VerdictBadge verdict={claim.verdict} />
       </div>
+      {claim.onlySaid && <p className="claim__only">Only said out loud. The README never makes this claim.</p>}
       <p className="claim__reason">{claim.reason}</p>
-      {claim.citations.length > 0 && (
-        <ul className="cites">
-          {claim.citations.map((cite) => (
-            <li className="cite" key={`${cite.path}:${cite.startLine}`}>
-              <a href={blobUrl(repo, cite.path, cite.startLine, cite.endLine)} target="_blank" rel="noreferrer">
-                <span className="cite__path">
-                  {cite.path}:{cite.startLine}
-                </span>
-                <code>{cite.quote}</code>
-              </a>
-            </li>
-          ))}
-        </ul>
-      )}
+      {claim.citations.length > 0 && <Cites citations={claim.citations} repo={repo} />}
       {claim.overruled && (
         <p className="claim__overruled">
           The model said {VERDICT_LABEL[claim.overruled.from].toLowerCase()}. {claim.overruled.why}
@@ -56,6 +64,7 @@ export function ClaimCard({
           {claim.sayInstead}
         </p>
       )}
+      {reportId && claim.verdict !== "implemented" && <Defend reportId={reportId} claimId={claim.id} repo={repo} />}
     </li>
   );
 }

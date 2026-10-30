@@ -40,12 +40,17 @@ export function geminiLlm(
   models: string[],
   { send = fetch, wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms)) } = {},
 ): Llm {
-  /** A busy or rate-limited model hands over to the next one, so one overloaded model cannot stall a report. */
+  const spent = new Set<string>();
+
+  /** A busy or rate-limited model hands over to the next one. A model out of daily quota is skipped from then on. */
   async function call(body: (model: string) => string): Promise<Response | null> {
     let last: Response | null = null;
+    let pause = false;
     for (let attempt = 0; attempt <= GEMINI_RETRIES; attempt += 1) {
-      if (attempt > 0) await wait(2 ** attempt * 500 + Math.random() * 500);
-      const model = models[attempt % models.length] as string;
+      const open = models.filter((name) => !spent.has(name));
+      if (open.length === 0) break;
+      if (pause) await wait(2 ** attempt * 500 + Math.random() * 500);
+      const model = open[attempt % open.length] as string;
       try {
         last = await send(GEMINI_URL, {
           method: "POST",
@@ -56,9 +61,13 @@ export function geminiLlm(
       } catch (error) {
         if (!(error instanceof Error) || error.name !== "TimeoutError") throw error;
         last = null;
+        pause = true;
         continue;
       }
       if (last.status !== 429 && last.status !== 503) return last;
+      const outForTheDay = last.status === 429 && /per day/i.test(await last.clone().text());
+      if (outForTheDay) spent.add(model);
+      pause = !outForTheDay;
     }
     return last;
   }
@@ -77,7 +86,7 @@ export function geminiLlm(
         }),
       );
       if (res === null) throw new LlmError("The model took too long. Try again in a minute.");
-      if (res.status === 429) throw new LlmError("The checker has used its free quota for now. Try again later.");
+      if (res.status === 429) throw new LlmError("Today's free checks are used up. Open a real report below, or try again after 12:30 pm IST.");
       if (res.status === 503) throw new LlmError("The model is overloaded. Try again in a minute.");
       if (!res.ok) throw new LlmError(`The model answered ${res.status}.`);
 

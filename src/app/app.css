@@ -62,3 +62,10 @@
 .linklike{padding:0;border:0;background:none;font:inherit;color:var(--accent-ink);text-decoration:underline;cursor:pointer}
 .terminal{margin:0;padding:16px 18px 8px;font:400 13px/1.7 var(--font-mono);white-space:pre-wrap;overflow-wrap:anywhere}
 .terminal__note{padding:0 18px 16px;font-size:13px;color:#A4A4AE}
+
+.claim__only{margin:10px 0 0;font-size:13.5px;font-weight:600;color:var(--ink-2,var(--ink-3))}
+.defend{margin-top:14px;padding-top:12px;border-top:1px solid var(--line,rgba(127,127,127,.2))}
+.defend__clock{font:600 14px/1 var(--font-mono,monospace);font-variant-numeric:tabular-nums}
+.defend textarea{width:100%;min-height:96px;margin:10px 0}
+.defend__foot{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.defend__result{margin-top:12px}

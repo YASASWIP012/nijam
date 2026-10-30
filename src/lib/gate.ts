@@ -40,15 +40,35 @@ export function hasLiveCode(quote: string): boolean {
  * something related exists, and "not in the repo" would overstate it.
  */
 export function absenceHolds(claim: Claim, files: Map<string, string>): boolean {
-  const terms = [...new Set(claim.terms.flatMap(tokenize).filter((term) => term.length >= 4))];
+  const terms = stems(claim);
   if (terms.length === 0) return false;
-  const needed = terms.length === 1 ? 1 : Math.max(2, Math.ceil(terms.length * 0.6));
+  const needed = termsNeeded(terms);
   for (const [path, text] of files) {
     if (classify(path) !== "source") continue;
-    const tokens = new Set(tokenize(text));
-    if (terms.filter((term) => tokens.has(term)).length >= needed) return false;
+    if (matchedTerms(terms, text) >= needed) return false;
   }
   return true;
+}
+
+/** Search terms cut to their stem, so "hashed" finds "hash" and "reminders" finds "reminder". */
+function stems(claim: Claim): string[] {
+  const words = claim.terms.flatMap(tokenize).filter((term) => term.length >= 4);
+  return [...new Set(words.map((term) => term.replace(/(ing|ed|es|s)$/, "")))];
+}
+
+const termsNeeded = (terms: string[]) => (terms.length === 1 ? 1 : Math.max(2, Math.ceil(terms.length * 0.6)));
+
+function matchedTerms(terms: string[], text: string): number {
+  const tokens = [...new Set(tokenize(text))];
+  return terms.filter((term) => tokens.some((token) => token.startsWith(term))).length;
+}
+
+/** True for a claim the README never makes: the speaker only said it out loud. */
+export function onlySaid(claim: Claim, files: Map<string, string>): boolean {
+  const readme = [...files].find(([path]) => /^readme\.[a-z]+$/i.test(path))?.[1];
+  const terms = stems(claim);
+  if (readme === undefined || terms.length === 0) return false;
+  return matchedTerms(terms, readme) < termsNeeded(terms);
 }
 
 /** Finds the words in the pitch. A claim nobody said is dropped. */
@@ -118,6 +138,9 @@ export function applyGate(claim: Claim, raw: RawVerdict, ctx: GateContext): Chec
   } else if (raw.verdict === "simulated" && inCode.length === 0) {
     verdict = "unclear";
     why = "The fake path it pointed to could not be found in source files.";
+  } else if (raw.verdict === "missing" && claim.kind === "metric") {
+    verdict = "unclear";
+    why = "Reading code cannot show that a number is false, only that nothing here proves it.";
   } else if (raw.verdict === "missing" && !ctx.coverage.complete) {
     verdict = "unclear";
     why = "Some source files were not read, so absence cannot be proven.";

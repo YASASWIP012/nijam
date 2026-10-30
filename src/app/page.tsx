@@ -98,6 +98,8 @@ node history.mjs --days 2`}
             <ul className="checklist">
               <li>A verdict for each claim, with the lines behind it</li>
               <li>A rewrite for anything the code does not support</li>
+              <li>A flag on every claim you said but never wrote down</li>
+              <li>Twenty seconds to defend an unsettled claim out loud</li>
               <li>A WHAT-IS-REAL.md you can commit</li>
               <li>A signed receipt tied to one commit</li>
             </ul>

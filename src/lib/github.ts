@@ -45,11 +45,13 @@ async function inPool<T>(items: T[], size: number, work: (item: T) => Promise<vo
   );
 }
 
-export async function loadRepo(url: string): Promise<{ repo: RepoRef; snapshot: Snapshot }> {
+export async function loadRepo(url: string, commit?: string): Promise<{ repo: RepoRef; snapshot: Snapshot }> {
   const { owner, name } = parseRepoUrl(url);
   const meta = await api<{ default_branch: string; private: boolean }>(`/repos/${owner}/${name}`);
   if (meta.private) throw new RepoError("That repo is private or does not exist.");
-  const head = await api<{ sha: string }>(`/repos/${owner}/${name}/commits/${meta.default_branch}`);
+  const head = commit
+    ? { sha: commit }
+    : await api<{ sha: string }>(`/repos/${owner}/${name}/commits/${meta.default_branch}`);
   const tree = await api<{
     tree: { path: string; type: string; size?: number }[];
     truncated: boolean;

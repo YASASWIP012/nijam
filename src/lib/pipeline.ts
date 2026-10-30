@@ -1,6 +1,6 @@
-import { applyGate, checkTestCount, locateSaid } from "./gate";
+import { applyGate, checkTestCount, locateSaid, onlySaid } from "./gate";
 import { LlmError, type Llm } from "./llm";
-import { EXTRACT_SYSTEM, extractUser, INSTRUCTIONS_NOTE, VERIFY_SYSTEM, verifyUser } from "./prompts";
+import { DEFEND_NOTE, EXTRACT_SYSTEM, extractUser, INSTRUCTIONS_NOTE, VERIFY_SYSTEM, verifyUser } from "./prompts";
 import { countVerdicts, receiptInput, sha256 } from "./report";
 import { RepoIndex, signalsIn, type Chunk } from "./search";
 import { factsOf, type Snapshot } from "./snapshot";
@@ -15,7 +15,7 @@ import {
   type RunEvent,
 } from "./types";
 
-const MAX_CLAIMS = 10;
+const MAX_CLAIMS = 12;
 const MAX_INSTRUCTIONS = 20;
 const CHUNKS_PER_CLAIM = 12;
 const CONCURRENCY = 2;
@@ -57,10 +57,10 @@ export async function extractClaims(
   return { claims: kept, dropped };
 }
 
-function evidenceFor(claim: Claim, index: RepoIndex): Chunk[] {
+function evidenceFor(claim: Claim, index: RepoIndex, answer = ""): Chunk[] {
   const seen = new Set<string>();
   const merged: Chunk[] = [];
-  const queries = [claim.terms.join(" "), `${claim.claim} ${claim.terms.join(" ")}`];
+  const queries = [answer, claim.terms.join(" "), `${claim.claim} ${claim.terms.join(" ")}`].filter(Boolean);
   for (const hits of queries.map((query) => index.search(query, CHUNKS_PER_CLAIM))) {
     for (const chunk of hits) {
       const key = `${chunk.path}:${chunk.startLine}`;
@@ -93,6 +93,20 @@ export async function checkClaim(
   return applyGate(claim, raw, { files: snapshot.files, coverage: snapshot.coverage });
 }
 
+/** Rechecks one claim with the author's spoken answer as a pointer. The answer can direct the search, never settle it. */
+export async function defendClaim(claim: Claim, answer: string, snapshot: Snapshot, llm: Llm): Promise<CheckedClaim> {
+  const index = new RepoIndex(snapshot.files);
+  const facts = factsOf(snapshot.files);
+  const chunks = evidenceFor(claim, index, answer);
+  const signals = chunks.flatMap((chunk) => signalsIn(chunk).map((signal) => ({ path: chunk.path, signal })));
+  const raw = await llm.json({
+    system: VERIFY_SYSTEM + DEFEND_NOTE,
+    user: `${verifyUser(claim, chunks, signals, facts, snapshot.coverage)}\n\n<answer>\n${answer}\n</answer>`,
+    schema: RawVerdict,
+  });
+  return applyGate(claim, raw, { files: snapshot.files, coverage: snapshot.coverage });
+}
+
 export async function* run({ pitch, pitchSource, load, llm, find, sign }: RunInput): AsyncGenerator<RunEvent> {
   yield { type: "stage", stage: "repo" };
   const { repo, snapshot } = await load();
@@ -118,7 +132,9 @@ export async function* run({ pitch, pitchSource, load, llm, find, sign }: RunInp
   const queue = claims.map((claim, position) => ({ claim, position }));
   const workers = Array.from({ length: CONCURRENCY }, async () => {
     for (let next = queue.shift(); next; next = queue.shift()) {
-      const result = await checkClaim(next.claim, snapshot, index, facts, llm);
+      const found = await checkClaim(next.claim, snapshot, index, facts, llm);
+      const said = pitchSource !== "readme" && onlySaid(found, snapshot.files);
+      const result = said ? { ...found, onlySaid: true } : found;
       checked[next.position] = result;
       finished.push(result);
     }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { absenceHolds, applyGate, checkTestCount, confirmCitation, hasLiveCode, locateSaid, numbersInCode } from "./gate";
+import { absenceHolds, applyGate, checkTestCount, confirmCitation, hasLiveCode, locateSaid, numbersInCode, onlySaid } from "./gate";
 import type { Claim, Coverage, RawVerdict } from "./types";
 
 const files = new Map([
@@ -131,6 +131,7 @@ describe("applyGate", () => {
 });
 
 describe("numbersInCode", () => {
+  const ctx0 = { files, coverage: complete };
   const metric: Claim = { ...claim, kind: "metric", claim: "Shrinks 410,977 rows to 1.09 GB" };
   const cite = (quote: string) => [{ path: "src/a.ts", startLine: 1, endLine: 1, quote }];
 
@@ -149,12 +150,33 @@ describe("numbersInCode", () => {
     expect(numbersInCode(metric, cite("const ROWS = 410977; const SIZE_GB = 1.09;"))).toBe(true);
   });
 
+  it("never calls a number missing", () => {
+    const result = applyGate({ ...metric, terms: ["zebra"] }, raw({ verdict: "missing" }), ctx0);
+    expect(result.verdict).toBe("unclear");
+  });
+
   it("does not match a number inside a longer one", () => {
     expect(numbersInCode({ ...metric, claim: "Handles 40 rows" }, cite("const MAX = 1400;"))).toBe(false);
   });
 
   it("leaves claims of other kinds alone", () => {
     expect(numbersInCode({ ...metric, kind: "feature" }, cite("nothing here"))).toBe(true);
+  });
+});
+
+describe("onlySaid", () => {
+  const readme = new Map([["README.md", "Charges real cards through the payment provider.\n"]]);
+
+  it("flags a claim the README never makes", () => {
+    expect(onlySaid({ ...claim, terms: ["whatsapp", "reminder"] }, readme)).toBe(true);
+  });
+
+  it("does not flag one it makes", () => {
+    expect(onlySaid({ ...claim, terms: ["charges", "cards"] }, readme)).toBe(false);
+  });
+
+  it("says nothing when there is no README", () => {
+    expect(onlySaid({ ...claim, terms: ["charges"] }, new Map())).toBe(false);
   });
 });
 
@@ -170,6 +192,11 @@ describe("hasLiveCode", () => {
 });
 
 describe("absenceHolds", () => {
+  it("finds a word in another form", () => {
+    const code = new Map([["src/a.ts", "const hash = createHash(pin);\n"]]);
+    expect(absenceHolds({ ...claim, terms: ["hashed"] }, code)).toBe(false);
+  });
+
   it("needs terms to search for", () => {
     expect(absenceHolds({ ...claim, terms: [] }, files)).toBe(false);
   });

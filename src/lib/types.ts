@@ -55,6 +55,8 @@ export interface CheckedClaim extends Claim {
   /** Set when code overruled the model. Holds what the model said first. */
   overruled?: { from: Verdict; why: string };
   sayInstead?: string;
+  /** The README never makes this claim. It exists only in what was said. */
+  onlySaid?: boolean;
 }
 
 export interface Coverage {

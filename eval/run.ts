@@ -14,7 +14,8 @@ if (!report) throw new Error("no report");
 
 let right = 0;
 const rows = CASES.map((item) => {
-  const found = report!.claims.find((claim) => claim.said.toLowerCase().includes(item.said.slice(0, 18).toLowerCase()));
+  const label = item.said.toLowerCase();
+  const found = report!.claims.find((claim) => label.includes(claim.said.toLowerCase()) || claim.said.toLowerCase().includes(label));
   const verdict = found?.verdict ?? "not extracted";
   if (verdict === item.label) right += 1;
   return { said: item.said, label: item.label, verdict, overruled: found?.overruled?.from ?? null };

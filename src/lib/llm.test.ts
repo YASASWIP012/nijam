@@ -50,7 +50,7 @@ describe("geminiLlm", () => {
 
   it("stops retrying and says the quota ran out", async () => {
     const fake = scripted(...Array.from({ length: 6 }, () => reply(429)));
-    await expect(geminiLlm("k", ["m"], fake).json(request)).rejects.toThrow(/free quota/);
+    await expect(geminiLlm("k", ["m"], fake).json(request)).rejects.toThrow(/free checks/);
     expect(fake.bodies).toHaveLength(6);
   });
 
@@ -58,6 +58,23 @@ describe("geminiLlm", () => {
     const fake = scripted(reply(503), reply(200, answer('{"verdict":"missing"}')));
     await geminiLlm("k", ["busy", "free"], fake).json(request);
     expect(fake.bodies.map((body) => body.model)).toEqual(["busy", "free"]);
+  });
+
+  it("skips a model out of daily quota without waiting", async () => {
+    const waits: number[] = [];
+    const fake = {
+      ...scripted(
+        reply(429, { error: { message: "limit: 20 requests per day" } }),
+        reply(200, answer('{"verdict":"missing"}')),
+        reply(200, answer('{"verdict":"implemented"}')),
+      ),
+      wait: async (ms: number) => void waits.push(ms),
+    };
+    const llm = geminiLlm("k", ["spent", "open"], fake);
+    await llm.json(request);
+    await llm.json(request);
+    expect(fake.bodies.map((body) => body.model)).toEqual(["spent", "open", "open"]);
+    expect(waits).toHaveLength(0);
   });
 
   it("moves on when a call times out", async () => {

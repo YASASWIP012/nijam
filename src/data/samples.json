@@ -9,25 +9,65 @@
     "claims": [
       {
         "said": "All of mainnet since Ironwood, 410,977 transactions, goes from 5.16 GB as mined to 1.09 GB,",
-        "claim": "The indexer reduces 410,977 mainnet transactions from 5.16 GB to a 1.09 GB index.",
+        "claim": "The index reduces the size of 410,977 mainnet transactions from 5.16 GB to 1.09 GB.",
         "kind": "metric",
+        "terms": [
+          "mainnet",
+          "transactions",
+          "Ironwood",
+          "indexer",
+          "size"
+        ],
+        "id": "c1",
+        "verdict": "unclear",
+        "reason": "The provided code excerpts do not contain the logic or measurements for these specific dataset statistics, which appear only in documentation.",
+        "citations": [],
+        "sayInstead": "The documentation states that all of Ironwood (410,977 transactions) goes from 5.16 GB as mined to 1.09 GB."
+      },
+      {
+        "said": "bf-indexer walks the chain from Ironwood activation and keeps every transaction with a shielded output.",
+        "claim": "bf-indexer processes the blockchain from Ironwood activation and stores transactions containing shielded outputs.",
+        "kind": "feature",
         "terms": [
           "bf-indexer",
           "Ironwood",
-          "mainnet",
-          "GB",
-          "transactions"
+          "shielded",
+          "output",
+          "chain"
         ],
-        "id": "c1",
+        "id": "c2",
         "verdict": "implemented",
-        "reason": "The bf-indexer tool implements a sync and build process that downloads Zcash transactions starting from the Ironwood activation height. The bf-tx library performs the size reduction by zeroing out proofs and signatures (authorizing data) and collapsing the resulting zero runs using a specialized codec, which achieves the reported storage reduction while maintaining the ability to verify transaction IDs.",
+        "reason": "The indexer walks the blockchain starting from the Ironwood network upgrade and filters transactions to keep those containing shielded outputs, Orchard actions, or Ironwood actions.",
         "citations": [
           {
             "path": "crates/bf-indexer/src/main.rs",
             "startLine": 1,
-            "endLine": 4,
-            "quote": "//! `bf-indexer sync` walks the chain from Ironwood activation, downloads every\n//! transaction with a shielded output, strips its proofs and appends it to a\n//! log. `bf-indexer build` packs the log into the index and PIR rows the\n//! server loads."
+            "endLine": 2,
+            "quote": "//! `bf-indexer sync` walks the chain from Ironwood activation, downloads every\n//! transaction with a shielded output, strips its proofs and appends it to a"
           },
+          {
+            "path": "crates/bf-indexer/src/main.rs",
+            "startLine": 207,
+            "endLine": 218,
+            "quote": "            let wanted: Vec<(TxKey, Vec<u8>)> = blocks\n                .iter()\n                .flat_map(|b| {\n                    b.vtx.iter().filter_map(move |tx| {\n                        let shielded_out =\n                            !tx.outputs.is_empty() || !tx.actions.is_empty() || !tx.ironwood_actions.is_empty();\n                        shielded_out.then(|| {\n                            (TxKey { height: b.height as u32, tx_index: tx.index as u32 }, tx.txid.clone())\n                        })\n                    })\n                })\n                .collect();"
+          }
+        ]
+      },
+      {
+        "said": "It zeroes the proofs and signatures, which sit outside the txid (ZIP 244, ZIP 229), and collapses the zeros.",
+        "claim": "Transactions are modified by zeroing proofs and signatures and collapsing the zero bytes while preserving the txid.",
+        "kind": "feature",
+        "terms": [
+          "proofs",
+          "signatures",
+          "ZIP 244",
+          "ZIP 229",
+          "txid"
+        ],
+        "id": "c3",
+        "verdict": "implemented",
+        "reason": "The code reads raw transactions, zeroes out proofs and signatures while preserving their canonical lengths, compresses the resulting zero runs, and verifies that the transaction ID remains unchanged.",
+        "citations": [
           {
             "path": "crates/bf-tx/src/lib.rs",
             "startLine": 61,
@@ -37,72 +77,25 @@
           {
             "path": "crates/bf-tx/src/lib.rs",
             "startLine": 92,
-            "endLine": 93,
-            "quote": "/// Zeroes every proof and signature the txid does not commit to, keeping\n/// their lengths so the transaction still parses, then collapses the zeros."
-          },
-          {
-            "path": "crates/bf-indexer/src/main.rs",
-            "startLine": 112,
-            "endLine": 118,
-            "quote": "    /// The database starts where the Ironwood pool does.\n    fn first_height(self) -> u32 {\n        self.params()\n            .activation_height(NetworkUpgrade::Nu6_3)\n            .map(u32::from)\n            .expect(\"Ironwood is active on both networks\")\n    }"
-          }
-        ]
-      },
-      {
-        "said": "a round of four queries is 4.06 MiB up and 0.47 MiB down and takes about 4.6 s.",
-        "claim": "A set of four PIR queries transfers 4.06 MiB upstream and 0.47 MiB downstream in approximately 4.6 seconds on M1 hardware.",
-        "kind": "metric",
-        "terms": [
-          "MiB",
-          "queries",
-          "seconds",
-          "bandwidth",
-          "performance"
-        ],
-        "id": "c2",
-        "verdict": "implemented",
-        "reason": "The codebase implements the PIR protocol and includes instrumentation to measure and display the data transfer sizes and round-trip time. Specifically, the web application calculates these values based on the actual length of the generated request and the received response, while the indexing tool includes a benchmark that records bytes transferred and elapsed time. The numbers mentioned in the claim are documented results of running this measurement logic on the specified hardware.",
-        "citations": [
-          {
-            "path": "web/app.js",
-            "startLine": 91,
-            "endLine": 91,
-            "quote": "    const body = session.buildRound(h, i);"
-          },
-          {
-            "path": "web/app.js",
-            "startLine": 110,
-            "endLine": 113,
-            "quote": "        <div><dt>Sent</dt><dd>${batch} queries, ${fmtBytes(body.length)}</dd></div>\n        <div><dt>Received</dt><dd>${fmtBytes(answer.length)}</dd></div>\n        <div><dt>Queries built</dt><dd>${Math.round(t1 - t0)} ms</dd></div>\n        <div><dt>Round trip</dt><dd>${Math.round(t2 - t1)} ms</dd></div>"
-          },
-          {
-            "path": "crates/bf-indexer/src/main.rs",
-            "startLine": 386,
-            "endLine": 389,
-            "quote": "        let (results, rounds) = bf.fetch(&params, &wants).await?;\n        let found = results.iter().filter(|(_, f)| matches!(f, bf_client::Fetched::Found(_))).count();\n        let up: usize = rounds.iter().map(|r| r.bytes_up).sum();\n        let down: usize = rounds.iter().map(|r| r.bytes_down).sum();"
-          },
-          {
-            "path": "crates/bf-indexer/src/main.rs",
-            "startLine": 397,
-            "endLine": 397,
-            "quote": "            started.elapsed().as_millis()"
+            "endLine": 95,
+            "quote": "/// Zeroes every proof and signature the txid does not commit to, keeping\n/// their lengths so the transaction still parses, then collapses the zeros.\n#[cfg(feature = \"strip\")]\nfn zero_auth(tx: Transaction) -> Result<Vec<u8>, Error> {"
           }
         ]
       },
       {
         "said": "bf-server packs them into 32 KiB rows and answers YPIR queries over the rows.",
-        "claim": "The server organizes transaction data into 32 KiB rows for processing PIR queries.",
-        "kind": "feature",
+        "claim": "bf-server packs transactions into 32 KiB rows and serves YPIR queries.",
+        "kind": "integration",
         "terms": [
           "bf-server",
-          "32 KiB",
-          "rows",
           "YPIR",
-          "PIR"
+          "rows",
+          "queries",
+          "valar-ypir"
         ],
-        "id": "c3",
+        "id": "c4",
         "verdict": "implemented",
-        "reason": "The project defines a constant for 32 KiB rows and implements server-side logic to answer PIR queries using the SimplePIR protocol from the ypir library, organizing transaction data into these fixed-size rows.",
+        "reason": "The server implementation packs data into 32 KiB rows and uses the YPIR library to perform real cryptographic PIR computations to answer client queries.",
         "citations": [
           {
             "path": "crates/bf-core/src/lib.rs",
@@ -113,285 +106,32 @@
           {
             "path": "crates/bf-pir/src/lib.rs",
             "startLine": 174,
-            "endLine": 174,
-            "quote": "        pub fn answer(&self, query: &[u8]) -> anyhow::Result<Vec<u8>> {"
-          },
-          {
-            "path": "crates/bf-pir/src/lib.rs",
-            "startLine": 186,
-            "endLine": 186,
-            "quote": "                self.server.perform_online_computation_simplepir(&q, &self.offline, &[&pp], None)"
+            "endLine": 190,
+            "quote": "        pub fn answer(&self, query: &[u8]) -> anyhow::Result<Vec<u8>> {\n            ensure!(query.len() >= 8, \"query too short\");\n            let q_len = u64::from_le_bytes(query[..8].try_into().unwrap()) as usize;\n            let rest = &query[8..];\n            ensure!(q_len % 8 == 0 && q_len > 0 && q_len < rest.len(), \"bad query layout\");\n            ensure!((rest.len() - q_len) % 8 == 0, \"bad public parameter length\");\n            let words = |b: &[u8]| -> Vec<u64> {\n                b.chunks_exact(8).map(|c| u64::from_le_bytes(c.try_into().unwrap())).collect()\n            };\n            let q = words(&rest[..q_len]);\n            let pp = words(&rest[q_len..]);\n            let resp = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {\n                self.server.perform_online_computation_simplepir(&q, &self.offline, &[&pp], None)\n            }))\n            .map_err(|_| anyhow::anyhow!(\"query rejected by YPIR\"))?;\n            Ok(resp)\n        }"
           }
         ]
       },
       {
-        "said": "asks for them in rounds of exactly four queries, with queries for random rows shuffled in.",
-        "claim": "The client requests transaction rows in batches of exactly four queries, including randomized dummy queries.",
-        "kind": "feature",
+        "said": "a round of four queries is 4.06 MiB up and 0.47 MiB down and takes about 4.6 s.",
+        "claim": "A query round takes about 4.6 seconds and transfers 4.06 MiB up and 0.47 MiB down.",
+        "kind": "metric",
         "terms": [
           "queries",
-          "rounds",
-          "random",
-          "shuffled"
-        ],
-        "id": "c4",
-        "verdict": "implemented",
-        "reason": "The client generates query plans where every round is padded with random dummy rows until it reaches a fixed batch size, which the client enforces must be at least four. These real and dummy queries are then shuffled together using a Fisher-Yates shuffle before being sent to the server.",
-        "citations": [
-          {
-            "path": "crates/bf-core/src/lib.rs",
-            "startLine": 33,
-            "endLine": 33,
-            "quote": "pub const DEFAULT_BATCH: usize = 4;"
-          },
-          {
-            "path": "crates/bf-core/src/plan.rs",
-            "startLine": 52,
-            "endLine": 52,
-            "quote": "let rounds = rows.len().div_ceil(batch).max(min_rounds);"
-          },
-          {
-            "path": "crates/bf-core/src/plan.rs",
-            "startLine": 57,
-            "endLine": 59,
-            "quote": "while slots.len() < batch { slots.push(((random() % num_rows as u64) as usize, false)); }"
-          },
-          {
-            "path": "crates/bf-client/src/lib.rs",
-            "startLine": 254,
-            "endLine": 254,
-            "quote": "let plan = QueryPlan::new(needed, self.info.num_rows, self.info.batch, min_rounds, random_u64);"
-          }
-        ]
-      },
-      {
-        "said": "It zeroes the proofs and signatures, which sit outside the txid (ZIP 244, ZIP 229), and collapses the zeros.",
-        "claim": "The indexer replaces transaction proofs and signatures with collapsed zero data as per ZIP 244 and ZIP 229.",
-        "kind": "feature",
-        "terms": [
-          "ZIP 244",
-          "ZIP 229",
-          "proofs",
-          "signatures",
-          "zeroes"
+          "performance",
+          "bytes",
+          "speed",
+          "round"
         ],
         "id": "c5",
-        "verdict": "implemented",
-        "reason": "The `zero_auth` function in the `bf-tx` crate implements zeroing for Orchard and Sapling proofs and signatures, as well as transparent script signatures, which are the fields defined by ZIP 244 and 229 as sitting outside the transaction ID. After zeroing, it calls `bf_core::zeros::encode` to collapse the zero runs into a compressed format, as evidenced by the V4 path and the supporting comments and documentation.",
-        "citations": [
-          {
-            "path": "crates/bf-tx/src/lib.rs",
-            "startLine": 13,
-            "endLine": 17,
-            "quote": "//! The transaction parser insists that proofs have their canonical length,\n//! so stripping replaces each proof with zeros of the same length and then\n//! collapses long zero runs (`bf_core::zeros`). Decoding restores an\n//! ordinary transaction encoding that any parser reads. It must never be\n//! broadcast: with zeroed proofs it is not valid on chain."
-          },
-          {
-            "path": "crates/bf-tx/src/lib.rs",
-            "startLine": 83,
-            "endLine": 85,
-            "quote": "    fn map_script_sig(&self, s: transparent::address::Script) -> transparent::address::Script {\n        transparent::address::Script(zcash_script::script::Code(vec![0; s.0.0.len()]))\n    }"
-          },
-          {
-            "path": "crates/bf-tx/src/lib.rs",
-            "startLine": 95,
-            "endLine": 96,
-            "quote": "fn zero_auth(tx: Transaction) -> Result<Vec<u8>, Error> {\n    use orchard::primitives::redpallas;"
-          },
-          {
-            "path": "crates/bf-tx/src/lib.rs",
-            "startLine": 108,
-            "endLine": 108,
-            "quote": "        return Ok(bf_core::zeros::encode(&raw));"
-          },
-          {
-            "path": "crates/bf-tx/src/lib.rs",
-            "startLine": 115,
-            "endLine": 121,
-            "quote": "                |_, _, _sig| redpallas::Signature::<redpallas::SpendAuth>::from([0u8; 64]),\n                |_, auth: BundleAuthorized| {\n                    let len = auth.proof().as_ref().len();\n                    BundleAuthorized::from_parts(\n                        Proof::new(vec![0; len]),\n                        redpallas::Signature::<redpallas::Binding>::from([0u8; 64]),\n                    )"
-          },
-          {
-            "path": "crates/bf-tx/src/lib.rs",
-            "startLine": 130,
-            "endLine": 133,
-            "quote": "                |_, _| [0u8; 192],\n                |_, _| [0u8; 192],\n                |_, _| redjubjub::Signature::<redjubjub::SpendAuth>::from([0u8; 64]),\n                |_, _| sapling::bundle::Authorized { binding_sig: redjubjub::Signature::from([0u8; 64]) },"
-          }
-        ]
-      },
-      {
-        "said": "bf-indexer walks the chain from Ironwood activation and keeps every transaction with a shielded output.",
-        "claim": "The indexer processes the Zcash blockchain starting at Ironwood activation, filtering for transactions with shielded outputs.",
-        "kind": "data",
-        "terms": [
-          "bf-indexer",
-          "Ironwood",
-          "shielded output",
-          "chain"
-        ],
-        "id": "c6",
-        "verdict": "implemented",
-        "reason": "The indexer's sync process filters transactions by checking if they contain Sapling outputs, Orchard actions, or Ironwood actions, which are the components of shielded transactions in this project's context. The code iterates through blocks, identifies these 'wanted' transactions, and fetches their raw data for indexing.",
-        "citations": [
-          {
-            "path": "crates/bf-indexer/src/main.rs",
-            "startLine": 1,
-            "endLine": 2,
-            "quote": "//! `bf-indexer sync` walks the chain from Ironwood activation, downloads every\n//! transaction with a shielded output, strips its proofs and appends it to a"
-          },
-          {
-            "path": "crates/bf-indexer/src/main.rs",
-            "startLine": 210,
-            "endLine": 213,
-            "quote": "                    b.vtx.iter().filter_map(move |tx| {\n                        let shielded_out =\n                            !tx.outputs.is_empty() || !tx.actions.is_empty() || !tx.ironwood_actions.is_empty();\n                        shielded_out.then(|| {"
-          },
-          {
-            "path": "crates/bf-indexer/src/main.rs",
-            "startLine": 28,
-            "endLine": 30,
-            "quote": "    /// Start here instead of at Ironwood activation. For sampling only: a\n    /// database that starts late does not cover older transactions.\n    #[arg(long)]"
-          }
-        ]
-      },
-      {
-        "said": "The wallet checks every row, dummies too, against a hash in the index and recomputes each transaction's txid.",
-        "claim": "The client validates every downloaded row by verifying hashes and recomputing transaction IDs.",
-        "kind": "quality",
-        "terms": [
-          "verify",
-          "hash",
-          "index",
-          "txid",
-          "recomputes"
-        ],
-        "id": "c7",
-        "verdict": "implemented",
-        "reason": "The browser-based wallet client iterates through every slot of a PIR response (including dummy rows) and validates each row against hashes stored in the index. Following successful row verification, the client reconstructs the transaction and recomputes its transaction ID to ensure integrity.",
-        "citations": [
-          {
-            "path": "crates/bf-wasm/src/lib.rs",
-            "startLine": 147,
-            "endLine": 163,
-            "quote": "// Decode and check every slot, dummies too, so a corrupted dummy fails\n        // exactly like a corrupted real row.\n        let mut rows: Vec<(usize, Vec<u8>)> = Vec::new();\n        let mut ok = true;\n        for (((p, a), &r), &is_real) in pending.into_iter().zip(parts).zip(&row_ids).zip(&real) {\n            match self.pir.decode(p, a) {\n                Ok(row) if self.index.check_row(r, &row) => {\n                    if is_real {\n                        rows.push((r, row));\n                    }\n                }\n                _ => ok = false,\n            }\n        }\n        if !ok {\n            return Err(err(UNTRUSTED));\n        }"
-          },
-          {
-            "path": "crates/bf-tx/src/lib.rs",
-            "startLine": 160,
-            "endLine": 167,
-            "quote": "pub fn verify(bytes: &[u8], expected: TxId, branch: BranchId) -> Result<Transaction, Error> {\n    let tx = Transaction::read(&expand(bytes)?[..], branch)?;\n    let actual = tx.txid();\n    if actual != expected {\n        return Err(Error::TxidMismatch { expected, actual });\n    }\n    Ok(tx)\n}"
-          }
-        ]
-      },
-      {
-        "said": "YPIR comes from valar-ypir, the Zellic-audited crate ZODL uses for private nullifier lookups",
-        "claim": "The system integrates the valar-ypir Rust crate for Private Information Retrieval operations.",
-        "kind": "integration",
-        "terms": [
-          "valar-ypir",
-          "crate",
-          "YPIR",
-          "Zellic"
-        ],
-        "id": "c8",
-        "verdict": "implemented",
-        "reason": "The system includes a crate 'bf-pir' which acts as a wrapper for 'valar-ypir' (renamed as 'ypir' in dependencies). The code uses types like YPIRClient and YPIRSPConfig from this crate to manage Private Information Retrieval (PIR) queries and responses.",
-        "citations": [
-          {
-            "path": "crates/bf-pir/Cargo.toml",
-            "startLine": 15,
-            "endLine": 15,
-            "quote": "ypir = { version = \"0.2.1\", package = \"valar-ypir\", default-features = false }"
-          },
-          {
-            "path": "crates/bf-pir/src/lib.rs",
-            "startLine": 11,
-            "endLine": 11,
-            "quote": "use ypir::{client::YPIRClient, params::YPIRSPConfig};"
-          },
-          {
-            "path": "crates/bf-pir/src/lib.rs",
-            "startLine": 52,
-            "endLine": 55,
-            "quote": "pub struct Client {\n    scenario: Scenario,\n    inner: YPIRClient,\n}"
-          }
-        ]
-      },
-      {
-        "said": "--compare-with checks the index against a second server before any query.",
-        "claim": "The software includes a comparison flag to verify index consistency across multiple servers.",
-        "kind": "feature",
-        "terms": [
-          "--compare-with",
-          "index",
-          "server",
-          "consistency"
-        ],
-        "id": "c9",
-        "verdict": "implemented",
-        "reason": "The software defines a 'compare_with' method that fetches the index from a second server and ensures its digest matches the primary server's index. The command-line tool calls this check immediately after connecting to the primary server and before performing any data queries.",
-        "citations": [
-          {
-            "path": "crates/bf-client/src/lib.rs",
-            "startLine": 114,
-            "endLine": 129,
-            "quote": "    pub async fn compare_with(&self, other: &str) -> anyhow::Result<()> {\n        let other = other.trim_end_matches('/');\n        let info: Info = self.http.get(format!(\"{other}/v1/info\")).send().await?.error_for_status()?.json().await?;\n        ensure!(\n            info.first_height == self.info.first_height && info.last_height == self.info.last_height,\n            \"the second server is at heights {}..={}, this one at {}..={}; compare when both are at the same height\",\n            info.first_height,\n            info.last_height,\n            self.info.first_height,\n            self.info.last_height\n        );\n        let bytes = self.http.get(format!(\"{other}/v1/index\")).send().await?.error_for_status()?.bytes().await?;\n        let theirs = Index::decode(&bytes)?;\n        ensure!(theirs.digest() == self.index.digest(), \"{}\", UNTRUSTED);\n        Ok(())\n    }"
-          },
-          {
-            "path": "patches/zcash-devtool-blindfetch.patch",
-            "startLine": 47,
-            "endLine": 50,
-            "quote": "+    /// With --blindfetch, check the server's index against a second\n+    /// Blindfetch server before sending any query.\n+    #[arg(long, requires = \"blindfetch\")]\n+    compare_with: Option<String>,"
-          },
-          {
-            "path": "patches/zcash-devtool-blindfetch.patch",
-            "startLine": 126,
-            "endLine": 129,
-            "quote": "+            if let Some(other) = &self.compare_with {\n+                bf.compare_with(other).await?;\n+                println!(\"Index matches {other}.\");\n+            }"
-          }
-        ]
-      },
-      {
-        "said": "the wallet gets its transaction, checks it against the txid, and the server cannot tell which one it sent.",
-        "claim": "The PIR implementation prevents the server from identifying which specific transaction the wallet has retrieved.",
-        "kind": "quality",
-        "terms": [
-          "PIR",
-          "privacy",
-          "txid",
-          "server"
-        ],
-        "id": "c10",
-        "verdict": "implemented",
-        "reason": "The code uses a PIR (Private Information Retrieval) library to generate encrypted queries for specific database rows. The client then decodes these rows to reconstruct the transaction and verifies its transaction ID against the expected value. The server processes these queries using SimplePIR, which cryptographically ensures it cannot determine which rows (and thus which transactions) the client is retrieving.",
-        "citations": [
-          {
-            "path": "crates/bf-pir/src/lib.rs",
-            "startLine": 77,
-            "endLine": 79,
-            "quote": "    pub fn query(&self, row: usize) -> anyhow::Result<Pending> {\n        ensure!(row < self.scenario.num_items, \"row {row} out of range\");\n        let (query, seed) = self.inner.generate_query_simplepir(row);"
-          },
-          {
-            "path": "crates/bf-wasm/src/lib.rs",
-            "startLine": 151,
-            "endLine": 155,
-            "quote": "        for (((p, a), &r), &is_real) in pending.into_iter().zip(parts).zip(&row_ids).zip(&real) {\n            match self.pir.decode(p, a) {\n                Ok(row) if self.index.check_row(r, &row) => {\n                    if is_real {\n                        rows.push((r, row));"
-          },
-          {
-            "path": "crates/bf-wasm/src/lib.rs",
-            "startLine": 168,
-            "endLine": 169,
-            "quote": "        let tx = Transaction::read(&bf_tx::expand(&bytes).map_err(err)?[..], branch).map_err(err)?;\n        let txid = tx.txid();"
-          },
-          {
-            "path": "crates/bf-wasm/src/lib.rs",
-            "startLine": 178,
-            "endLine": 179,
-            "quote": "                let want = TxId::from_bytes(b.try_into().unwrap());\n                Some(bf_tx::verify(&bytes, want, branch).is_ok())"
-          }
-        ]
+        "verdict": "unclear",
+        "reason": "The provided code excerpts measure round metrics dynamically but do not contain or verify these specific timing and size numbers.",
+        "citations": [],
+        "sayInstead": "The repository measures round byte sizes and duration dynamically, but these specific performance numbers are not stated in the code excerpts."
       }
     ],
     "id": "d660ae1750602a",
     "pitchSource": "readme",
-    "createdAt": "2026-10-30T14:16:41.854Z",
+    "createdAt": "2026-10-30T14:23:23.963Z",
     "coverage": {
       "totalFiles": 228,
       "readFiles": 114,
@@ -414,13 +154,13 @@
       "overCap": 0
     },
     "counts": {
-      "implemented": 10,
+      "implemented": 3,
       "simulated": 0,
       "missing": 0,
-      "unclear": 0
+      "unclear": 2
     },
-    "receipt": "1965b1b65daf5c6d1e1220531b3d586755ebaeb70576b4287ee1f8be3f819873",
-    "signature": "Yr3tXFSLSwVqUSJZklN0UTX/4SGhmrS/XYXJGqxhxAIxX9u2zSptIbJL31vWogBo1V9Pvo18XUhOvnyFfaflBQ=="
+    "receipt": "f5e81b4389434da9b37e68e356f16421c4173abcc9b0e4d114f54afbdfa4fb09",
+    "signature": "9dBThTTtzCA+iYfic1Sn4J9E4zwh7aJb95UwlUwxjOelYj04SKRwvVEPPRET2BPYSnvU2X39PuJ2oVmNgMDeCA=="
   },
   {
     "repo": {
@@ -431,22 +171,25 @@
     "pitch": "For India's RTI filers: know your deadlines today, and protect your evidence if the work turns dangerous. The Union government told the Rajya Sabha that 17,50,863 RTI applications were filed in 2023-24 (ETV Bharat). When a Public Information Officer misses the 30-day deadline, the filer has to know the date, treat the silence as a refusal, and file a First Appeal in time. Second appeals then wait: 4,13,972 appeals and complaints were pending across India's 29 information commissions on 30 June 2025, and a matter filed with the Telangana commission on 1 July 2025 has an estimated wait of 29 years and 2 months (Satark Nagrik Sangathan, report card 2024-25). Miss a window and the request is lost. The RTI clock works on a real application today. Enter the date the PIO received it, and it gives the reply deadline (section 7(1)), the date silence counts as refusal (7(2)), the First Appeal window (19(1)), the date the First Appellate Authority must decide (19(6)) and the Second Appeal window (19(3)), shows the backlog at your state's information commission, and drafts the First Appeal in English, हिन्दी or తెలుగు. A filer can also add their application, anonymously, to a public count per commission kept on Arkiv; the page reads how many recorded applications each commission is waiting on, and how many are past their reply deadline, with a range query on the node. What you type stays in your browser. If you choose to record the application, Arkiv gets only a salted commitment that reveals nothing about it or you. Used on a real application. On 20 October 2026 a person outside the team (a relative of the builder, unnamed by choice) filed a real RTI application with the Central Information Commission and recorded it with the RTI clock at 13:42 IST. The record is on Arkiv: open it on the RTI clock, entity 0xaf4321fc…7d2e75, written by a one-time key 0xBf35…3A39 in transaction 0x8610378a…c3c1 at block 817078. It holds only a salted commitment, so nothing about the application or the filer is on chain; the filer keeps the receipt that ties it to their application. The clock gives the reply deadline as 19 November 2026, and the record stays on Arkiv through both appeal windows after that. They did not add it to the public count. This is one filer, not a pilot. For the few whose RTI work puts them in danger, the vault is the next layer. CHRI counts at least 107 RTI users murdered since 2005. Seal your documents and check in with one tap. If you stop, the custodians you chose can open them, and nobody can delete the record: not you, not us, not whoever comes for you. The vault runs on Arkiv's testnet, so for now it is a working rehearsal. Built on Arkiv, the Web3 database, for Arkiv: Global Tour Stop (9 to 18 October 2026). Tracks: Best Indian Use Case, Censorship Resistance, Privacy, Security, Open Source. All documents in this build are synthetic and the network is a testnet. Testnet versus real use: this build proves the design end to end on Tiramisu. Real ac",
     "claims": [
       {
-        "said": "The RTI clock works on a real application today. Enter the date the PIO received it, and it gives the reply deadline (section 7(1)), the date silence counts as refusal (7(2)), the First Appeal window (19(1)), the date the First Appellate Authority must decide (19(6)) and the Second Appeal window (19(3)), shows the backlog at your state's information commission, and drafts the First Appeal in English, हिन्दी or తెలుగు.",
-        "claim": "The application calculates RTI deadlines including reply deadline, refusal date, appeal windows, and drafts the First Appeal in English, Hindi, or Telugu based on the PIO receipt date.",
+        "said": "Enter the date the PIO received it, and it gives the reply deadline (section 7(1)), the date silence counts as refusal (7(2)), the First Appeal window (19(1)), the date the First Appellate Authority must decide (19(6)) and the Second Appeal window (19(3)), shows the backlog at your state's information commission, and drafts the First Appeal in English, हिन्दी or తెలుగు.",
+        "claim": "The application calculates deadlines for reply, refusal, First Appeal, First Appellate Authority decision, and Second Appeal based on the PIO receipt date, shows state information commission backlogs, and drafts First Appeals in English, Hindi, and Telugu.",
         "kind": "feature",
         "terms": [
-          "RTI clock",
           "deadline",
+          "reply deadline",
           "section 7(1)",
+          "refusal",
           "First Appeal",
-          "PIO",
+          "Second Appeal",
+          "backlog",
+          "draft",
           "English",
-          "Hindi",
-          "Telugu"
+          "हिन्दी",
+          "తెలుగు"
         ],
         "id": "c1",
         "verdict": "implemented",
-        "reason": "The RTI clock calculates the statutory deadlines including reply due dates, refusal periods, and appeal windows based on the PIO receipt date, displays information commission backlogs, and generates the First Appeal draft in English, Hindi, or Telugu.",
+        "reason": "The application calculates all required statutory deadlines using the PIO receipt date, displays information commission backlogs, and supports drafting First Appeals in English, Hindi, and Telugu.",
         "citations": [
           {
             "path": "packages/core/src/arkiv/rti.ts",
@@ -455,33 +198,34 @@
             "quote": "export function rtiClock(p: RtiInput): RtiClock {\n  const extra = (p.apio ? 5 : 0) + Math.max(0, Math.floor(p.feeDays ?? 0));\n  const replyDueMs = p.kind === \"life\" ? p.receivedMs + 48 * 3_600_000 + extra * DAY : endOfDayAfter(p.receivedMs, 30 + extra);\n  const firstAppealByMs = endOfDayAfter(replyDueMs, 30);\n  const appealMs = p.appealMs ?? startOfNextDay(replyDueMs);\n  const faaDecisionDueMs = endOfDayAfter(appealMs, 30);\n  return { replyDueMs, firstAppealByMs, appealMs, faaDecisionDueMs, faaOuterMs: endOfDayAfter(appealMs, 45), secondAppealByMs: endOfDayAfter(faaDecisionDueMs, 90) };\n}"
           },
           {
-            "path": "web/src/pages/Rti.tsx",
-            "startLine": 394,
-            "endLine": 418,
-            "quote": "function Letter({ clock, overdue, receivedMs, withTime, now, record }: { clock: ReturnType<typeof rtiClock>; overdue: boolean; receivedMs: number; withTime: boolean; now: number; record: { block: bigint; ms: number; link: string } | null }) {\n  const { t, lang } = useI18n();\n  const [ll, setLl] = useState<Lang>(lang);\n  const [f, setF] = useState<Fields>({ name: \"\", addr: \"\", auth: \"\", pio: \"\", reg: \"\", subject: \"\", reason: \"\" });\n  useEffect(() => setLl(lang), [lang]);\n  const L = (k: keyof Strings, vars: Record<string, string> = {}) => {\n    let s = DICTS[ll][k] ?? en[k];\n    for (const [name, v] of Object.entries(vars)) s = s.replaceAll(`{${name}}`, v);\n    return s;\n  };\n  const v = (k: keyof Fields, ph: keyof Strings) => f[k].trim() || L(ph);\n  const late = now > clock.firstAppealByMs;\n  const letter = L(\"rti_letter_body\", {\n    auth: v(\"auth\", \"rti_ph_auth\"),\n    name: v(\"name\", \"rti_ph_name\"),\n    addr: v(\"addr\", \"rti_ph_addr\"),\n    pio: v(\"pio\", \"rti_ph_pio\"),\n    reg: v(\"reg\", \"rti_ph_reg\"),\n    subject: v(\"subject\", \"rti_ph_subject\"),\n    today: fmt(now, ll),\n    filed: fmt(receivedMs, ll, withTime),\n    due: fmt(clock.replyDueMs, ll, withTime),\n    timing: late ? L(\"rti_letter_late\", { reason: v(\"reason\", \"rti_ph_reason\") }) : L(\"rti_letter_intime\"),\n    record: record ? L(\"rti_letter_record\", { block: record.block.toString(), time: fmt(record.ms, ll, true), link: record.link }) : \"\",\n  });"
+            "path": "web/src/lib/i18n.tsx",
+            "startLine": 1,
+            "endLine": 8,
+            "quote": "import { createContext, useContext, useEffect, useState, type ReactNode } from \"react\";\nimport { en, type Strings } from \"./strings.en\";\nimport { hi } from \"./strings.hi\";\nimport { te } from \"./strings.te\";\n\nexport type Lang = \"en\" | \"hi\" | \"te\";\nconst DICTS: Record<Lang, Partial<Strings>> = { en, hi, te };\nexport const LANG_NAMES: Record<Lang, string> = { en: \"English\", hi: \"हिन्दी\", te: \"తెలుగు\" };"
           }
         ]
       },
       {
         "said": "A filer can also add their application, anonymously, to a public count per commission kept on Arkiv; the page reads how many recorded applications each commission is waiting on, and how many are past their reply deadline, with a range query on the node.",
-        "claim": "Filers can anonymously add applications to a public count on Arkiv and query commission waiting counts and past deadline numbers.",
-        "kind": "feature",
+        "claim": "Filers can anonymously add applications to a public count on Arkiv, and the page queries counts of waiting and overdue applications per commission.",
+        "kind": "integration",
         "terms": [
           "Arkiv",
           "public count",
-          "commission",
+          "anonymous",
           "range query",
-          "node"
+          "commission",
+          "deadline"
         ],
         "id": "c2",
         "verdict": "implemented",
-        "reason": "The codebase implements anonymous RTI tallies through `recordRti`, which attaches an optional commission tally entity in the same batch, and `rtiTally`, which queries Arkiv and uses a range query on `due_block` to count recorded and overdue applications per commission.",
+        "reason": "Filers can optionally include an anonymous public count row when recording an RTI application, and the query function uses range filtering on the due block to count waiting and overdue submissions per commission.",
         "citations": [
           {
             "path": "packages/core/src/arkiv/writes.ts",
-            "startLine": 199,
-            "endLine": 216,
-            "quote": "export async function recordRti(wallet: WalletClient, reader: PublicClient, p: { commitment: Hex; dueMs: number; nowMs?: number; commission?: string }) {\n  const head = await reader.getBlockNumber();\n  const dueBlock = head + BigInt(Math.ceil((p.dueMs - (p.nowMs ?? Date.now())) / 1000 / BLOCK_SECONDS));\n  if (dueBlock <= head + 30n) throw new Error(\"the reply deadline has passed, so there is nothing left to time\");\n  const payload: RtiPayload = { v: 2, commitment: p.commitment.toLowerCase(), due_block: dueBlock.toString() };\n  const r = await sealedBatch(\n    wallet,\n    reader,\n    [\n      { payload: jsonToPayload(payload), contentType: JSON_T, attributes: rtiAttrs(p.commitment), expires: ExpirationTime.atBlock(rtiExpiryBlock(dueBlock)), flags: { readonly: true, permissionlessExtension: false } },\n      // The opt-in public count rides in the same batch, sealed the same way, and lives as long as the record.\n      ...(p.commission ? [{ payload: new Uint8Array(), contentType: BIN, attributes: rtiTallyAttrs(p.commission, dueBlock), expires: ExpirationTime.atBlock(rtiExpiryBlock(dueBlock)), flags: { readonly: true, permissionlessExtension: false } }] : []),\n    ],\n    new Set(),\n    rtiSealOwner(p.commitment),\n  );\n  return { key: r.createdEntities[0], txHash: r.txHash, dueBlock };\n}"
+            "startLine": 209,
+            "endLine": 210,
+            "quote": "      // The opt-in public count rides in the same batch, sealed the same way, and lives as long as the record.\n      ...(p.commission ? [{ payload: new Uint8Array(), contentType: BIN, attributes: rtiTallyAttrs(p.commission, dueBlock), expires: ExpirationTime.atBlock(rtiExpiryBlock(dueBlock)), flags: { readonly: true, permissionlessExtension: false } }] : []),"
           },
           {
             "path": "packages/core/src/arkiv/reads.ts",
@@ -492,18 +236,19 @@
         ]
       },
       {
-        "said": "What you type stays in your browser. If you choose to record the application, Arkiv gets only a salted commitment that reveals nothing about it or you.",
-        "claim": "User input stays in the browser and only a salted commitment is sent to Arkiv.",
-        "kind": "quality",
+        "said": "If you choose to record the application, Arkiv gets only a salted commitment that reveals nothing about it or you.",
+        "claim": "Recording an application on Arkiv sends only a salted commitment that preserves privacy.",
+        "kind": "data",
         "terms": [
-          "browser",
-          "salted commitment",
           "Arkiv",
-          "privacy"
+          "salted commitment",
+          "privacy",
+          "record",
+          "anonymous"
         ],
         "id": "c3",
         "verdict": "implemented",
-        "reason": "The browser processes user input locally and sends only a salted commitment and due block to Arkiv via the recordRti function.",
+        "reason": "The code generates a salted commitment using a random device salt and the application's hash, sending only that commitment and the reply due block to Arkiv while keeping the application text and user identity entirely private.",
         "citations": [
           {
             "path": "packages/core/src/arkiv/rti.ts",
@@ -514,29 +259,6 @@
           {
             "path": "packages/core/src/arkiv/writes.ts",
             "startLine": 199,
-            "endLine": 203,
-            "quote": "export async function recordRti(wallet: WalletClient, reader: PublicClient, p: { commitment: Hex; dueMs: number; nowMs?: number; commission?: string }) {\n  const head = await reader.getBlockNumber();\n  const dueBlock = head + BigInt(Math.ceil((p.dueMs - (p.nowMs ?? Date.now())) / 1000 / BLOCK_SECONDS));\n  if (dueBlock <= head + 30n) throw new Error(\"the reply deadline has passed, so there is nothing left to time\");\n  const payload: RtiPayload = { v: 2, commitment: p.commitment.toLowerCase(), due_block: dueBlock.toString() };"
-          }
-        ]
-      },
-      {
-        "said": "The record is on Arkiv: open it on the RTI clock, entity 0xaf4321fc…7d2e75, written by a one-time key 0xBf35…3A39 in transaction 0x8610378a…c3c1 at block 817078.",
-        "claim": "Records are stored on Arkiv with specific transaction and block details.",
-        "kind": "integration",
-        "terms": [
-          "Arkiv",
-          "entity",
-          "transaction",
-          "block",
-          "one-time key"
-        ],
-        "id": "c4",
-        "verdict": "implemented",
-        "reason": "The codebase implements storing RTI records on Arkiv and returns transaction and block details through the recordRti function.",
-        "citations": [
-          {
-            "path": "packages/core/src/arkiv/writes.ts",
-            "startLine": 199,
             "endLine": 216,
             "quote": "export async function recordRti(wallet: WalletClient, reader: PublicClient, p: { commitment: Hex; dueMs: number; nowMs?: number; commission?: string }) {\n  const head = await reader.getBlockNumber();\n  const dueBlock = head + BigInt(Math.ceil((p.dueMs - (p.nowMs ?? Date.now())) / 1000 / BLOCK_SECONDS));\n  if (dueBlock <= head + 30n) throw new Error(\"the reply deadline has passed, so there is nothing left to time\");\n  const payload: RtiPayload = { v: 2, commitment: p.commitment.toLowerCase(), due_block: dueBlock.toString() };\n  const r = await sealedBatch(\n    wallet,\n    reader,\n    [\n      { payload: jsonToPayload(payload), contentType: JSON_T, attributes: rtiAttrs(p.commitment), expires: ExpirationTime.atBlock(rtiExpiryBlock(dueBlock)), flags: { readonly: true, permissionlessExtension: false } },\n      // The opt-in public count rides in the same batch, sealed the same way, and lives as long as the record.\n      ...(p.commission ? [{ payload: new Uint8Array(), contentType: BIN, attributes: rtiTallyAttrs(p.commission, dueBlock), expires: ExpirationTime.atBlock(rtiExpiryBlock(dueBlock)), flags: { readonly: true, permissionlessExtension: false } }] : []),\n    ],\n    new Set(),\n    rtiSealOwner(p.commitment),\n  );\n  return { key: r.createdEntities[0], txHash: r.txHash, dueBlock };\n}"
           }
@@ -544,58 +266,65 @@
       },
       {
         "said": "If you stop, the custodians you chose can open them, and nobody can delete the record: not you, not us, not whoever comes for you.",
-        "claim": "The vault allows chosen custodians to open sealed documents if the user stops checking in, and records are immutable.",
+        "claim": "Selected custodians can open sealed vault documents if the user stops checking in, and records cannot be deleted.",
         "kind": "feature",
         "terms": [
           "vault",
           "custodians",
-          "seal",
+          "check in",
           "delete",
-          "record"
+          "record",
+          "seal"
         ],
-        "id": "c5",
+        "id": "c4",
         "verdict": "implemented",
-        "reason": "The repository implements sealed vaults owned by unholdable addresses that prevent deletion by the creator, and enables chosen custodians to publish their decryption shares once the user's heartbeat lapses.",
+        "reason": "The code stores sealed vault data as read-only entities owned by a non-activist address so they cannot be deleted, and enables chosen custodians to release their key shares once the heartbeat lapses.",
         "citations": [
           {
             "path": "scripts/e2e.ts",
             "startLine": 70,
-            "endLine": 70,
-            "quote": "// The activist cannot delete sealed data."
+            "endLine": 77,
+            "quote": "// The activist cannot delete sealed data.\ntry {\n  if (process.env.KEEP === \"0\") throw new Error(\"skipped: with keep-alive off the activist owns its data by design\");\n  await walletClient(activist, { rpc }).deleteEntity({ entityKey: v.key });\n  report.activistDeleteSealed = process.env.KEEP === \"0\" ? \"deleted (expected: keep-alive off leaves ownership with the activist)\" : \"DELETED (bad)\";\n} catch (e) {\n  report.activistDeleteSealed = `refused: ${(e as Error).message.split(\"\\n\")[0]}`;\n}"
           },
           {
             "path": "scripts/e2e.ts",
-            "startLine": 105,
+            "startLine": 103,
             "endLine": 105,
-            "quote": "  const r = await releaseMyShare(walletClient(cs[i], { rpc }), reader, v, cs[i].secret);"
+            "quote": "for (const i of [0, 2]) {\n  v = await loadVault(reader, sealed.vaultId, activist.address);\n  const r = await releaseMyShare(walletClient(cs[i], { rpc }), reader, v, cs[i].secret);"
           }
         ]
       },
       {
         "said": "The vault runs on Arkiv's testnet, so for now it is a working rehearsal.",
-        "claim": "The vault runs on Arkiv's testnet.",
+        "claim": "The vault runs on the Arkiv testnet.",
         "kind": "integration",
         "terms": [
           "vault",
           "Arkiv",
           "testnet"
         ],
-        "id": "c6",
+        "id": "c5",
         "verdict": "implemented",
-        "reason": "The codebase connects clients directly to Arkiv's Tiramisu testnet RPC and WebSocket endpoints for reading and writing vault data.",
+        "reason": "The codebase explicitly configures Arkiv clients to connect to the Tiramisu testnet and references it across configuration schemas and interface strings.",
         "citations": [
           {
             "path": "packages/core/src/arkiv/client.ts",
-            "startLine": 5,
-            "endLine": 10,
-            "quote": "export const TIRAMISU = {\n  chainId: 7738577,\n  rpc: \"https://rpc.tiramisu.db-chain.testnet.arkiv.network\",\n  ws: \"wss://rpc.tiramisu.db-chain.testnet.arkiv.network\",\n  explorer: \"https://tiramisu.explorer.arkiv.network\",\n} as const;"
+            "startLine": 6,
+            "endLine": 6,
+            "quote": "  chainId: 7738577,"
+          },
+          {
+            "path": "packages/core/src/arkiv/client.ts",
+            "startLine": 7,
+            "endLine": 7,
+            "quote": "  rpc: \"https://rpc.tiramisu.db-chain.testnet.arkiv.network\","
           }
         ]
       }
     ],
     "id": "17bab4827999c9",
     "pitchSource": "readme",
-    "createdAt": "2026-10-30T14:18:54.933Z",
+    "createdAt": "2026-10-30T14:24:12.738Z",
     "coverage": {
       "totalFiles": 115,
       "readFiles": 110,
@@ -618,13 +347,13 @@
       "overCap": 0
     },
     "counts": {
-      "implemented": 6,
+      "implemented": 5,
       "simulated": 0,
       "missing": 0,
       "unclear": 0
     },
-    "receipt": "ca8842340e367ce0ccf858c14c128d7ec22b6908439b0f177ad0bf0fb91a1266",
-    "signature": "60jQAiKbCMW+mAHxR07aEZcLcMIzIsXF97wUBzlIdHQxuOPjw+XwXTn+kWewXVilpxZXaLBQS7UuFWxGzHazAQ=="
+    "receipt": "690836ab94db1f36be1d64dc5e295de2e4dbcff4fc52db08f4e74d7b03cd383d",
+    "signature": "aUqMkxN1gIWaQ5dUSaNslIIBoEjO29SXwl7FlfSIWsUvZVjw8h4PmTr6pO/GlpyiGekF9nxr26icPUaWrr//BA=="
   },
   {
     "repo": {
@@ -635,20 +364,19 @@
     "pitch": "Trace, the DATA Foundation's registry for AI training data, has recorded more than 250 million receipts. Each one says where a file came from, which app collected it, which terms the contributor accepted, and when it was registered. Each check also says what it doesn't prove. A valid signature shows the app vouched for those exact fields at that moment. It says nothing about whether the consent was informed or the rights are valid. All three public checks can be run by an outsider today, using only what Trace, the provider and the DATA Network explorer publish. On Oct 28, 2026 the audit script drew 1,000 receipts at random from Trace's history (registered between Jul 1 and Oct 26, 2026) and ran the three public checks on each. The nine receipts whose fields didn't rebuild the root are all unsigned Numo receipts from the Numo Mobile and Poseidon Season 1 clients. Their roots are on chain like every other receipt's. Those apps don't sign, so there's no way to tell from outside how they built the root. The page reports them as \"can't check this yet\" and doesn't treat them as changed. Numo and oto receipts (57 in the sample) carry no provider signature, so check 2 doesn't apply to them. Every receipt checked is listed in results/audit-20261028.json, with the summary in results/audit-20261028.md. To redraw the same sample: The DATA Network and Trace are moving to Sui, and Walrus becomes the default storage layer for DATA Foundation apps. Under the announced plan, Trace would keep an encrypted copy of each original on Walrus, with access controlled by Seal. A licensed buyer could then run check 4 against the stored original. The page shows this behind a \"With Walrus on Sui (planned)\" switch and never runs a check against it. The current DATA Network keeps running until the upgrade, and holders don't need to do anything. Sources: Sui announcement, DATA on Sui docs. The server only proxies public data, because Trace doesn't send CORS headers. Every hash and signature check runs in the browser. Responses are cached, and the featured receipt has a saved copy so the page still works if a source is slow. An independent project. Not made by or affiliated with the DATA Foundation, Sui or Walrus. MIT licensed.",
     "claims": [
       {
-        "said": "has recorded more than 250 million receipts.",
-        "claim": "Trace registry has recorded over 250 million receipts.",
+        "said": "Trace, the DATA Foundation's registry for AI training data, has recorded more than 250 million receipts.",
+        "claim": "Trace has recorded over 250 million receipts.",
         "kind": "metric",
         "terms": [
           "Trace",
           "receipts",
-          "registry",
           "DATA Foundation"
         ],
         "id": "c1",
         "verdict": "unclear",
-        "reason": "The repository mentions in its documentation and UI text that Trace has recorded over 250 million receipts, but contains no code that tracks, computes, or verifies this total count.",
+        "reason": "This repository contains a client-side receipt verification tool and does not implement the Trace registry or record receipts itself.",
         "citations": [],
-        "sayInstead": "The repository's documentation states that Trace has recorded over 250 million receipts, but the codebase does not verify or measure this statistic.",
+        "sayInstead": "저장소에는 영수증을 직접 기록하는 코드가 없으며, 외부 Trace 레지스트리의 영수증을 확인하는 검증 도구만 포함되어 있습니다.",
         "overruled": {
           "from": "missing",
           "why": "A search of the whole repo found source files using these words, so it may exist in another form."
@@ -656,17 +384,23 @@
       },
       {
         "said": "Every receipt checked is listed in results/audit-20261028.json, with the summary in results/audit-20261028.md.",
-        "claim": "Audit results and summary are saved in specified json and markdown files.",
+        "claim": "Audit results are saved in results/audit-20261028.json and summarized in results/audit-20261028.md.",
         "kind": "data",
         "terms": [
-          "audit",
-          "results/audit-20261028.json",
-          "results/audit-20261028.md"
+          "audit-20261028.json",
+          "audit-20261028.md",
+          "results"
         ],
         "id": "c2",
         "verdict": "implemented",
-        "reason": "The audit script saves the individual receipt results in audit-20261028.json and the summary report in audit-20261028.md using file writing functions.",
+        "reason": "The audit script saves individual checked receipt rows to results/audit-20261028.json and generates a markdown summary in results/audit-20261028.md using the default seed.",
         "citations": [
+          {
+            "path": "scripts/audit.ts",
+            "startLine": 23,
+            "endLine": 23,
+            "quote": "const SEED = arg(\"seed\", 20261028);"
+          },
           {
             "path": "scripts/audit.ts",
             "startLine": 210,
@@ -682,76 +416,104 @@
         ]
       },
       {
+        "said": "The server only proxies public data, because Trace doesn't send CORS headers.",
+        "claim": "The server proxies public data to bypass missing CORS headers on Trace.",
+        "kind": "feature",
+        "terms": [
+          "server",
+          "proxy",
+          "public data",
+          "Trace",
+          "CORS"
+        ],
+        "id": "c3",
+        "verdict": "unclear",
+        "reason": "The code implements server-side fetching of public data from Trace, but the codebase contains no evidence or code comments explaining whether this is done because Trace lacks CORS headers.",
+        "citations": [],
+        "sayInstead": "The server proxies public data from Trace and the block explorer."
+      },
+      {
         "said": "Every hash and signature check runs in the browser.",
-        "claim": "Hash and signature validations execute entirely in the client browser.",
+        "claim": "All hash and signature checks execute in the browser.",
         "kind": "feature",
         "terms": [
           "hash",
           "signature",
-          "browser",
-          "check"
+          "check",
+          "browser"
         ],
-        "id": "c3",
+        "id": "c4",
         "verdict": "implemented",
-        "reason": "The code uses the Web Crypto API (`crypto.subtle`) to compute hashes and verify cryptographic signatures directly in the browser.",
+        "reason": "The application executes cryptographic checks using the browser's native Web Crypto API (`crypto.subtle`), keeping all hash and signature verification client-side.",
         "citations": [
           {
+            "path": "README.md",
+            "startLine": 75,
+            "endLine": 75,
+            "quote": "The server only proxies public data, because Trace doesn't send CORS headers. Every hash and signature check runs in the browser. Responses are cached, and the featured receipt has a saved copy so the page still works if a source is slow."
+          },
+          {
             "path": "src/lib/checks.ts",
-            "startLine": 44,
-            "endLine": 58,
-            "quote": "  const key = await crypto.subtle.importKey(\n    \"jwk\",\n    { kty: jwk.kty, crv: jwk.crv, x: jwk.x, y: jwk.y, ext: true },\n    { name: \"ECDSA\", namedCurve: \"P-256\" },\n    false,\n    [\"verify\"],\n  );\n  const sig = base64UrlToBytes(att.signature);\n  if (sig.length !== 64) return { status: \"mismatch\", evidence };\n  const ok = await crypto.subtle.verify(\n    { name: \"ECDSA\", hash: \"SHA-256\" },\n    key,\n    sig as BufferSource,\n    new TextEncoder().encode(att.payload_hash),\n  );"
+            "startLine": 53,
+            "endLine": 53,
+            "quote": "  const ok = await crypto.subtle.verify("
           }
         ]
       },
       {
-        "said": "The server only proxies public data, because Trace doesn't send CORS headers.",
-        "claim": "The server proxies public data due to missing CORS headers on Trace.",
-        "kind": "integration",
+        "said": "Responses are cached, and the featured receipt has a saved copy so the page still works if a source is slow.",
+        "claim": "API responses are cached and a saved copy of the featured receipt is maintained.",
+        "kind": "feature",
         "terms": [
-          "server",
-          "proxy",
-          "Trace",
-          "CORS"
-        ],
-        "id": "c4",
-        "verdict": "unclear",
-        "reason": "The repository code successfully implements server-side proxying of public data from Trace, but the excerpts contain no code or evidence regarding CORS headers.",
-        "citations": [
-          {
-            "path": "src/lib/sources.ts",
-            "startLine": 22,
-            "endLine": 32,
-            "quote": "async function fetchText(url: string, revalidate: number): Promise<string> {\n  const res = await fetch(url, { headers: UA, next: { revalidate }, signal: AbortSignal.timeout(8000) });\n  if (!res.ok) throw new Error(`${url} returned ${res.status}`);\n  return res.text();\n}\n\nexport async function getActivity(count: number): Promise<ActivityEvent[]> {\n  const n = Math.min(Math.max(count, 1), 50);\n  const body = JSON.parse(await fetchText(`${TRACE}/api/activity?count=${n}`, 5));\n  return body.events as ActivityEvent[];\n}"
-          }
-        ],
-        "sayInstead": "The server proxies public data from Trace, though the repository code does not reference CORS headers."
-      },
-      {
-        "said": "the audit script drew 1,000 receipts at random from Trace's history",
-        "claim": "The audit script selects 1000 random receipts from Trace history.",
-        "kind": "data",
-        "terms": [
-          "audit script",
-          "receipts",
-          "Trace",
-          "random"
+          "cache",
+          "responses",
+          "featured receipt",
+          "saved copy"
         ],
         "id": "c5",
         "verdict": "implemented",
-        "reason": "The audit script uses a pseudo-random number generator to select positions across Trace's activity history and fetches N receipts (defaulting to 1,000) from those positions.",
+        "reason": "API routes specify caching headers, and `getReceipt` falls back to a pinned local JSON file if fetching from the remote source fails.",
+        "citations": [
+          {
+            "path": "src/app/api/receipt/[id]/route.ts",
+            "startLine": 8,
+            "endLine": 8,
+            "quote": "  return Response.json(result, { headers: { \"Cache-Control\": \"s-maxage=60, stale-while-revalidate=600\" } });"
+          },
+          {
+            "path": "src/lib/sources.ts",
+            "startLine": 34,
+            "endLine": 43,
+            "quote": "export async function getReceipt(dataId: string): Promise<{ receipt: TraceReceipt; snapshot: boolean } | null> {\n  try {\n    const receipt = extractReceipt(await fetchText(`${TRACE}/asset/${dataId}`, 60));\n    if (receipt) return { receipt, snapshot: false };\n  } catch {\n    // fall through to snapshot\n  }\n  if (dataId === snapshots.receipt.data_id) return { receipt: snapshots.receipt, snapshot: true };\n  return null;\n}"
+          }
+        ]
+      },
+      {
+        "said": "On Oct 28, 2026 the audit script drew 1,000 receipts at random from Trace's history",
+        "claim": "An audit script randomly drew 1,000 receipts from Trace's history.",
+        "kind": "quality",
+        "terms": [
+          "audit script",
+          "receipts",
+          "random",
+          "Trace"
+        ],
+        "id": "c6",
+        "verdict": "implemented",
+        "reason": "The audit script uses a seeded random number generator to sample positions within Trace's history bounds and fetches 1,000 distinct receipts.",
         "citations": [
           {
             "path": "scripts/audit.ts",
-            "startLine": 118,
-            "endLine": 139,
-            "quote": "  const random = rng(SEED);\n  const [lo, hi] =\n    Number.isFinite(LO) && Number.isFinite(HI)\n      ? [LO, HI]\n      : saved.lo != null && saved.hi != null\n        ? [saved.lo, saved.hi]\n        : await bounds();\n  saved.lo = lo;\n  saved.hi = hi;\n  console.log(`history positions ${lo}..${hi}, seed ${SEED}`);\n\n  // Draw positions until we have N distinct receipts.\n  const picked = new Map<string, { e: ActivityEvent; order: number }>(saved.picked ?? []);\n  while (picked.size < N) {\n    const want = Math.min(N - picked.size, 200);\n    const orders = Array.from({ length: want }, () => lo + Math.floor(random() * (hi - lo)));\n    const found = await pool(orders, CONCURRENCY, async (o) => ({ o, e: (await eventsBefore(o))[0] }));\n    for (const { o, e } of found) if (e && !picked.has(e.data_id) && picked.size < N) picked.set(e.data_id, { e, order: o });\n    console.log(`sampled ${picked.size}/${N}`);\n    saved.picked = [...picked];\n    save({});\n  }"
+            "startLine": 131,
+            "endLine": 135,
+            "quote": "  while (picked.size < N) {\n    const want = Math.min(N - picked.size, 200);\n    const orders = Array.from({ length: want }, () => lo + Math.floor(random() * (hi - lo)));\n    const found = await pool(orders, CONCURRENCY, async (o) => ({ o, e: (await eventsBefore(o))[0] }));\n    for (const { o, e } of found) if (e && !picked.has(e.data_id) && picked.size < N) picked.set(e.data_id, { e, order: o });"
           }
         ]
       }
     ],
     "id": "67a2977bee8a97",
     "pitchSource": "readme",
-    "createdAt": "2026-10-30T14:19:35.844Z",
+    "createdAt": "2026-10-30T14:25:05.430Z",
     "coverage": {
       "totalFiles": 53,
       "readFiles": 45,
@@ -774,35 +536,35 @@
       "overCap": 0
     },
     "counts": {
-      "implemented": 3,
+      "implemented": 4,
       "simulated": 0,
       "missing": 0,
       "unclear": 2
     },
-    "receipt": "8830eaa61e44901eb141b82a529907e73fcab6d2833c2fb9e8bd5e5444c9b057",
-    "signature": "WQkOV21iqGaye1orSPrFpjr7OF/bnYcEODIkAZk+kvzB7NEccTmUtr7tfgGS0F35KkRZc6Fhspa9SFLTX3wuDQ=="
+    "receipt": "8e7e3d1cae6ba66383d3f919bdbe5e7f5cec76128e1bb7e9cd8edb5d67789d28",
+    "signature": "32UVsLGA7NyOwq3IhLCFVfPX0XY6/xo7wZPUZq58D+If69kXToaKhOse4FAVcq+CyR3S/GnYJyH3WDoTp81FCA=="
   },
   {
     "repo": {
       "owner": "YASASWIP012",
       "name": "nijam",
-      "sha": "1ffaabf2fae476c927d26c81d6a8d09692dc1890"
+      "sha": "f7abd6e4a9fc60dc5c4b2260f4b7343cf849fa63"
     },
     "pitch": "Say what your project does, and Nijam checks every claim against the code. You paste a public GitHub link and pitch the project out loud, the way you would to a judge. Nijam splits the pitch into claims, reads the repo at one commit, and gives each claim a verdict with the lines behind it. Nijam means truth in Telugu. I built it because solo hackathon work ends with claims I have to check by hand before I submit. Spoken claims are the ones that reach judges, so that is what it checks. It has two modes. My pitch checks what you say about the project. What I told my tools checks the instructions you dictated to a coding tool, and tells you what to say next for anything that did not get built. public/history.mjs pulls those instructions from your local Wispr Flow history. It is read-only and sends nothing anywhere. Flow's history file is undocumented, so an update can break it. A language model reads the code and proposes a verdict. Code in src/lib/gate.ts then decides whether the proposal stands: Each report also gives you a WHAT-IS-REAL.md, an honest rewrite of the pitch, and a receipt: a SHA-256 hash over the commit, the text and the verdicts, signed with Ed25519. The browser can check both. The signature shows Nijam issued the report, and it does not make the verdicts true. Nijam reads code and does not run it. It cannot prove that something is deployed or that a number was measured. The gate confirms a quote exists, and it cannot confirm the model read it correctly or that the code is ever called, so dead code can pass. Pitches and repo excerpts go to a third-party language model, so it only accepts public repos. Set LLM_PROVIDER, LLM_API_KEY, LLM_MODEL, GITHUB_TOKEN and RECEIPT_KEY in .env.local. LLM_PROVIDER=gemini uses Gemini; any other value uses Anthropic. npm run eval scores the checker on a planted repo with hand-labelled answers in eval/labelled.ts.",
     "claims": [
       {
         "said": "public/history.mjs pulls those instructions from your local Wispr Flow history.",
-        "claim": "public/history.mjs reads from local Wispr Flow history.",
-        "kind": "data",
+        "claim": "public/history.mjs pulls instructions from the local Wispr Flow history.",
+        "kind": "feature",
         "terms": [
-          "history.mjs",
-          "Wispr Flow",
-          "local",
+          "public/history.mjs",
+          "Wispr",
+          "Flow",
           "history"
         ],
         "id": "c1",
         "verdict": "implemented",
-        "reason": "public/history.mjs locates the local Wispr Flow database file and reads dictation history from it using Node's SQLite database sync module.",
+        "reason": "public/history.mjs locates the local Wispr Flow database and reads dictation history from it.",
         "citations": [
           {
             "path": "public/history.mjs",
@@ -820,63 +582,55 @@
       },
       {
         "said": "Code in src/lib/gate.ts then decides whether the proposal stands:",
-        "claim": "src/lib/gate.ts determines if the LLM proposal stands.",
+        "claim": "Code in src/lib/gate.ts decides whether the model proposal stands.",
         "kind": "feature",
         "terms": [
-          "gate.ts",
-          "proposal",
-          "src/lib/gate.ts"
+          "src/lib/gate.ts",
+          "gate",
+          "proposal"
         ],
         "id": "c2",
         "verdict": "implemented",
-        "reason": "applyGate in src/lib/gate.ts processes citations and checks for live code to decide whether the LLM proposal stands.",
+        "reason": "applyGate in src/lib/gate.ts processes citations and checks conditions to decide whether the LLM proposal stands.",
         "citations": [
           {
             "path": "src/lib/gate.ts",
-            "startLine": 93,
-            "endLine": 125,
-            "quote": "export function applyGate(claim: Claim, raw: RawVerdict, ctx: GateContext): CheckedClaim {\n  const citations = raw.citations\n    .map((cited) => confirmCitation(ctx.files, cited))\n    .filter((cited): cited is Citation => cited !== null);\n  const inCode = citations.filter((cited) => classify(cited.path) === \"source\" && hasLiveCode(cited.quote));\n\n  let verdict: Verdict = raw.verdict;\n  let why: string | null = null;\n  if (raw.verdict === \"implemented\" && inCode.length === 0) {\n    verdict = \"unclear\";\n    why = citations.length\n      ? \"The lines cited are docs, tests, comments or imports, and a claim of working code needs running code.\"\n      : \"No cited line exists in the repo at this commit.\";\n  } else if (raw.verdict === \"simulated\" && inCode.length === 0) {\n    verdict = \"unclear\";\n    why = \"The fake path it pointed to could not be found in source files.\";\n  } else if (raw.verdict === \"missing\" && !ctx.coverage.complete) {\n    verdict = \"unclear\";\n    why = \"Some source files were not read, so absence cannot be proven.\";\n  } else if (raw.verdict === \"missing\" && !absenceHolds(claim, ctx.files)) {\n    verdict = \"unclear\";\n    why = \"A search of the whole repo found source files using these words, so it may exist in another form.\";\n  }\n\n  return {\n    ...claim,\n    verdict,\n    reason: raw.reason,\n    citations,\n    sayInstead: verdict === \"implemented\" || !raw.sayInstead.trim() ? undefined : raw.sayInstead.trim(),\n    ...(why ? { overruled: { from: raw.verdict, why } } : {}),\n  };\n}"
+            "startLine": 102,
+            "endLine": 137,
+            "quote": "export function applyGate(claim: Claim, raw: RawVerdict, ctx: GateContext): CheckedClaim {\n  const citations = raw.citations\n    .map((cited) => confirmCitation(ctx.files, cited))\n    .filter((cited): cited is Citation => cited !== null);\n  const inCode = citations.filter((cited) => classify(cited.path) === \"source\" && hasLiveCode(cited.quote));\n\n  let verdict: Verdict = raw.verdict;\n  let why: string | null = null;\n  if (raw.verdict === \"implemented\" && inCode.length === 0) {\n    verdict = \"unclear\";\n    why = citations.length\n      ? \"The lines cited are docs, tests, comments or imports, and a claim of working code needs running code.\"\n      : \"No cited line exists in the repo at this commit.\";\n  } else if (raw.verdict === \"implemented\" && !numbersInCode(claim, inCode)) {\n    verdict = \"unclear\";\n    why = \"The cited code does not contain this number, so it cannot show the number was measured.\";\n  } else if (raw.verdict === \"simulated\" && inCode.length === 0) {\n    verdict = \"unclear\";\n    why = \"The fake path it pointed to could not be found in source files.\";\n  } else if (raw.verdict === \"missing\" && !ctx.coverage.complete) {\n    verdict = \"unclear\";\n    why = \"Some source files were not read, so absence cannot be proven.\";\n  } else if (raw.verdict === \"missing\" && !absenceHolds(claim, ctx.files)) {\n    verdict = \"unclear\";\n    why = \"A search of the whole repo found source files using these words, so it may exist in another form.\";\n  }\n\n  return {\n    ...claim,\n    verdict,\n    reason: raw.reason,\n    citations,\n    sayInstead: verdict === \"implemented\" || !raw.sayInstead.trim() ? undefined : raw.sayInstead.trim(),\n    ...(why ? { overruled: { from: raw.verdict, why } } : {}),\n  };\n}"
           }
         ]
       },
       {
-        "said": "a SHA-256 hash over the commit, the text and the verdicts, signed with Ed25519.",
-        "claim": "The app generates a SHA-256 receipt signed with Ed25519.",
+        "said": "Each report also gives you a WHAT-IS-REAL.md, an honest rewrite of the pitch, and a receipt: a SHA-256 hash over the commit, the text and the verdicts, signed with Ed25519.",
+        "claim": "The application generates WHAT-IS-REAL.md and a SHA-256 receipt signed with Ed25519.",
         "kind": "feature",
         "terms": [
+          "WHAT-IS-REAL.md",
           "SHA-256",
           "Ed25519",
-          "receipt",
-          "hash",
-          "signature"
+          "receipt"
         ],
         "id": "c3",
-        "verdict": "implemented",
-        "reason": "The app computes a SHA-256 hash over the commit, pitch, and verdicts, and signs it using Ed25519.",
+        "verdict": "unclear",
+        "reason": "The application computes the SHA-256 receipt and verifies Ed25519 signatures, but contains no code to sign receipts with a private Ed25519 key.",
         "citations": [
           {
-            "path": "src/lib/report.ts",
-            "startLine": 5,
-            "endLine": 8,
-            "quote": "export async function sha256(text: string): Promise<string> {\n  const digest = await crypto.subtle.digest(\"SHA-256\", new TextEncoder().encode(text));\n  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, \"0\")).join(\"\");\n}"
-          },
-          {
-            "path": "src/lib/pipeline.ts",
-            "startLine": 143,
-            "endLine": 143,
-            "quote": "  const receipt = await sha256(receiptInput(base));"
-          },
-          {
-            "path": "src/lib/pipeline.ts",
-            "startLine": 154,
-            "endLine": 154,
-            "quote": "    signature: sign?.(receipt),"
+            "path": "src/components/ReportActions.tsx",
+            "startLine": 10,
+            "endLine": 13,
+            "quote": "async function verifySignature(receipt: string, signature: string): Promise<boolean> {\n  const key = await crypto.subtle.importKey(\"raw\", bytes(RECEIPT_PUBLIC_KEY), \"Ed25519\", false, [\"verify\"]);\n  return crypto.subtle.verify(\"Ed25519\", key, bytes(signature), new TextEncoder().encode(receipt));\n}"
           }
-        ]
+        ],
+        "sayInstead": "The application generates WHAT-IS-REAL.md and a SHA-256 receipt, but does not sign it with Ed25519 in the repository.",
+        "overruled": {
+          "from": "missing",
+          "why": "A search of the whole repo found source files using these words, so it may exist in another form."
+        }
       },
       {
         "said": "LLM_PROVIDER=gemini uses Gemini; any other value uses Anthropic.",
-        "claim": "Setting LLM_PROVIDER to gemini uses Gemini, otherwise it uses Anthropic.",
+        "claim": "Setting LLM_PROVIDER to gemini uses Gemini, and other values use Anthropic.",
         "kind": "feature",
         "terms": [
           "LLM_PROVIDER",
@@ -885,7 +639,7 @@
         ],
         "id": "c4",
         "verdict": "implemented",
-        "reason": "The code checks if the LLM_PROVIDER environment variable equals gemini, returning the Gemini client if true and the Anthropic client otherwise.",
+        "reason": "The live LLM factory checks if the LLM_PROVIDER environment variable equals gemini, returning the Gemini client if true and the Anthropic client otherwise.",
         "citations": [
           {
             "path": "src/lib/llm.ts",
@@ -897,17 +651,16 @@
       },
       {
         "said": "npm run eval scores the checker on a planted repo with hand-labelled answers in eval/labelled.ts.",
-        "claim": "npm run eval executes evaluation against labelled answers in eval/labelled.ts.",
+        "claim": "Running npm run eval scores the checker against answers in eval/labelled.ts.",
         "kind": "quality",
         "terms": [
-          "npm run eval",
+          "eval",
           "eval/labelled.ts",
-          "scores",
-          "checker"
+          "npm run eval"
         ],
         "id": "c5",
         "verdict": "implemented",
-        "reason": "The eval npm script executes eval/run.ts, which runs the pipeline against the planted repository and compares verdicts with the hand-labelled answers in eval/labelled.ts.",
+        "reason": "The eval npm script executes eval/run.ts, which runs the pipeline against a planted repository and scores the resulting verdicts against the hand-labelled answers in eval/labelled.ts.",
         "citations": [
           {
             "path": "package.json",
@@ -923,76 +676,26 @@
           },
           {
             "path": "eval/run.ts",
-            "startLine": 10,
-            "endLine": 10,
-            "quote": "for await (const event of run({ pitch: PITCH, pitchSource: \"planted\", llm: liveLlm(), load: async () => ({ repo, snapshot: snapshotFrom(REPO) }) })) {"
-          }
-        ]
-      },
-      {
-        "said": "Each report also gives you a WHAT-IS-REAL.md, an honest rewrite of the pitch,",
-        "claim": "The app generates a WHAT-IS-REAL.md file for each report.",
-        "kind": "feature",
-        "terms": [
-          "WHAT-IS-REAL.md",
-          "report",
-          "rewrite"
-        ],
-        "id": "c6",
-        "verdict": "implemented",
-        "reason": "The application provides a function to generate a WHAT-IS-REAL markdown document from report claims and verdicts, and a download action in the report view to save it as WHAT-IS-REAL.md.",
-        "citations": [
-          {
-            "path": "src/lib/report.ts",
-            "startLine": 33,
-            "endLine": 33,
-            "quote": "export function whatIsRealMarkdown(report: Report): string {"
+            "startLine": 16,
+            "endLine": 21,
+            "quote": "const rows = CASES.map((item) => {\n  const found = report!.claims.find((claim) => claim.said.toLowerCase().includes(item.said.slice(0, 18).toLowerCase()));\n  const verdict = found?.verdict ?? \"not extracted\";\n  if (verdict === item.label) right += 1;\n  return { said: item.said, label: item.label, verdict, overruled: found?.overruled?.from ?? null };\n});"
           },
           {
-            "path": "src/components/ReportActions.tsx",
-            "startLine": 27,
-            "endLine": 27,
-            "quote": "    link.download = \"WHAT-IS-REAL.md\";"
+            "path": "eval/labelled.ts",
+            "startLine": 70,
+            "endLine": 82,
+            "quote": "export const CASES: { said: string; label: Verdict }[] = [\n  { said: \"it calculates the invoice total with GST\", label: \"implemented\" },\n  { said: \"invoices are saved to a Postgres database\", label: \"implemented\" },\n  { said: \"bills are emailed to customers\", label: \"implemented\" },\n  { said: \"PINs are hashed and compared in constant time\", label: \"implemented\" },\n  { said: \"it takes live UPI payments\", label: \"simulated\" },\n  { said: \"an ML model scores fraud on every invoice\", label: \"simulated\" },\n  { said: \"OCR reads the vendor and total from receipt photos\", label: \"simulated\" },\n  { said: \"it syncs offline and resolves conflicts\", label: \"missing\" },\n  { said: \"it sends WhatsApp reminders for overdue bills\", label: \"missing\" },\n  { said: \"there is a multi-tenant admin dashboard\", label: \"missing\" },\n  { said: \"invoice totals are computed in 3 milliseconds\", label: \"unclear\" },\n];"
           }
         ]
-      },
-      {
-        "said": "Set LLM_PROVIDER, LLM_API_KEY, LLM_MODEL, GITHUB_TOKEN and RECEIPT_KEY in .env.local.",
-        "claim": "The application requires environment variables LLM_PROVIDER, LLM_API_KEY, LLM_MODEL, GITHUB_TOKEN and RECEIPT_KEY.",
-        "kind": "integration",
-        "terms": [
-          ".env.local",
-          "LLM_API_KEY",
-          "GITHUB_TOKEN",
-          "RECEIPT_KEY"
-        ],
-        "id": "c7",
-        "verdict": "unclear",
-        "reason": "The code uses all five environment variables, but GITHUB_TOKEN and RECEIPT_KEY are handled as optional rather than strictly required.",
-        "citations": [
-          {
-            "path": "src/lib/github.ts",
-            "startLine": 20,
-            "endLine": 27,
-            "quote": "function headers(): HeadersInit {\n  const token = process.env.GITHUB_TOKEN;\n  return {\n    Accept: \"application/vnd.github+json\",\n    \"User-Agent\": \"nijam\",\n    ...(token ? { Authorization: `Bearer ${token}` } : {}),\n  };\n}"
-          },
-          {
-            "path": "src/lib/sign.ts",
-            "startLine": 4,
-            "endLine": 6,
-            "quote": "export function signReceipt(receipt: string): string | undefined {\n  const pem = process.env.RECEIPT_KEY;\n  if (!pem) return undefined;"
-          }
-        ],
-        "sayInstead": "The application uses LLM_PROVIDER, LLM_API_KEY, LLM_MODEL, GITHUB_TOKEN, and RECEIPT_KEY from environment variables, where GitHub access and receipt signing are optional."
       }
     ],
-    "id": "479b71e548b99f",
+    "id": "e9f46679480922",
     "pitchSource": "readme",
-    "createdAt": "2026-10-30T14:20:38.033Z",
+    "createdAt": "2026-10-30T14:25:52.675Z",
     "coverage": {
       "totalFiles": 41,
       "readFiles": 40,
-      "bytes": 134974,
+      "bytes": 201878,
       "skipped": {
         "lockfile or minified": 1
       },
@@ -1000,21 +703,21 @@
     },
     "facts": {
       "sourceFiles": 28,
-      "sourceLines": 1915,
+      "sourceLines": 1929,
       "testFiles": 5,
-      "testCases": 62
+      "testCases": 66
     },
     "dropped": {
       "notInPitch": 0,
       "overCap": 0
     },
     "counts": {
-      "implemented": 6,
+      "implemented": 4,
       "simulated": 0,
       "missing": 0,
       "unclear": 1
     },
-    "receipt": "a7a17870d523a790336ed66441467f4db17ec614361b799622306e8bdd013e09",
-    "signature": "9IpFLFcafNFmJeCv/MPvWd57dR4gZhnoRdwP7+xHwv2LLbwBT6VmoG4kGFMY5WMAbiqGe8DjFubFMcq32KwoDw=="
+    "receipt": "853ca9c71fb97b26bf82bafc498d1d6eaa661eabfbd99d4231bb80abd9326323",
+    "signature": "DnHnefWpcEc2ZkTZK1IXdpTt0frGj5t5SJSWHHX+4eudlF5gl6Db7CQoU8xBkWF1ZL+JZex4JP+tUPNrL/DMDA=="
   }
 ]

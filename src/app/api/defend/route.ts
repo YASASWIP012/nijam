@@ -6,7 +6,7 @@ import { loadReport } from "@/lib/store";
 
 export const maxDuration = 120;
 
-const MAX_CHARS = 1500;
+const MAX_CHARS = 700;
 
 function refuse(message: string, status: number): Response {
   return Response.json({ message }, { status });

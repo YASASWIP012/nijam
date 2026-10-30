@@ -29,7 +29,7 @@ export function ReportView({ report }: { report: Report }) {
       </p>
       <p className="report__meta">
         {SOURCE_NOTE[report.pitchSource]}
-        {saidOnly > 0 && ` ${saidOnly} of ${report.claims.length} claims appear only in what was said, not in the README.`}
+        {saidOnly > 0 && ` ${saidOnly} of ${report.claims.length} claims are not in the README.`}
       </p>
       <div className="tally">
         {VERDICTS.map((verdict) => (

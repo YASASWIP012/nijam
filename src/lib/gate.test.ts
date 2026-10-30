@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { absenceHolds, applyGate, checkTestCount, confirmCitation, hasLiveCode, locateSaid, numbersInCode, onlySaid } from "./gate";
+import { absenceHolds, applyGate, checkTestCount, confirmCitation, hasLiveCode, keepsLanguage, locateSaid, numbersInCode, onlySaid } from "./gate";
 import type { Claim, Coverage, RawVerdict } from "./types";
 
 const files = new Map([
@@ -177,6 +177,17 @@ describe("onlySaid", () => {
 
   it("says nothing when there is no README", () => {
     expect(onlySaid({ ...claim, terms: ["charges"] }, new Map())).toBe(false);
+  });
+});
+
+describe("keepsLanguage", () => {
+  it("refuses a rewrite in a script the speaker never used", () => {
+    expect(keepsLanguage("the server proxies data", "서버가 데이터를 프록시합니다")).toBe(false);
+  });
+
+  it("keeps Telugu for Telugu, and allows English inside it", () => {
+    expect(keepsLanguage("ఇది నిజమైన కార్డులను", "ఇది demo మాత్రమే")).toBe(true);
+    expect(keepsLanguage("we charge cards", "We show a demo.")).toBe(true);
   });
 });
 

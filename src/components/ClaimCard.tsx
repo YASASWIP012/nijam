@@ -50,7 +50,7 @@ export function ClaimCard({
         </div>
         <VerdictBadge verdict={claim.verdict} />
       </div>
-      {claim.onlySaid && <p className="claim__only">Only said out loud. The README never makes this claim.</p>}
+      {claim.onlySaid && <p className="claim__only">Not in the README. Your own words are the only record of this claim.</p>}
       <p className="claim__reason">{claim.reason}</p>
       {claim.citations.length > 0 && <Cites citations={claim.citations} repo={repo} />}
       {claim.overruled && (

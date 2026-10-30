@@ -110,6 +110,18 @@ export function numbersInCode(claim: Claim, cited: Citation[]): boolean {
   return numbers.every((number) => new RegExp(`(^|[^\\d.])${number.replace(".", "\\.")}(?![\\d])`).test(code));
 }
 
+/** A rewrite has to stay in the speaker's language. Script letters the speaker never used mean the model drifted. */
+export function keepsLanguage(said: string, rewrite: string): boolean {
+  const scripts = (text: string) => new Set(text.match(/\p{L}/gu)?.map(scriptOf));
+  const spoken = scripts(said);
+  return [...scripts(rewrite)].every((script) => script === "Latin" || spoken.has(script));
+}
+
+function scriptOf(letter: string): string {
+  const names = ["Latin", "Devanagari", "Telugu"] as const;
+  return names.find((name) => new RegExp(`\\p{Script=${name}}`, "u").test(letter)) ?? "Other";
+}
+
 export interface GateContext {
   files: Map<string, string>;
   coverage: Coverage;
@@ -154,7 +166,10 @@ export function applyGate(claim: Claim, raw: RawVerdict, ctx: GateContext): Chec
     verdict,
     reason: raw.reason,
     citations,
-    sayInstead: verdict === "implemented" || !raw.sayInstead.trim() ? undefined : raw.sayInstead.trim(),
+    sayInstead:
+      verdict === "implemented" || !raw.sayInstead.trim() || !keepsLanguage(claim.said, raw.sayInstead)
+        ? undefined
+        : raw.sayInstead.trim(),
     ...(why ? { overruled: { from: raw.verdict, why } } : {}),
   };
 }

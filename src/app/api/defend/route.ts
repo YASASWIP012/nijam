@@ -1,3 +1,4 @@
+import { startClock, withinClock } from "@/lib/clock";
 import { loadRepo, RepoError } from "@/lib/github";
 import { allow } from "@/lib/limit";
 import { liveLlm, LlmError } from "@/lib/llm";
@@ -13,9 +14,23 @@ function refuse(message: string, status: number): Response {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  const body = (await request.json().catch(() => null)) as { id?: unknown; claimId?: unknown; answer?: unknown } | null;
+  const body = (await request.json().catch(() => null)) as {
+    id?: unknown;
+    claimId?: unknown;
+    answer?: unknown;
+    start?: unknown;
+    startedAt?: unknown;
+    token?: unknown;
+  } | null;
+  if (body?.start === true && typeof body.claimId === "string") return Response.json(await startClock(body.claimId));
   const answer = typeof body?.answer === "string" ? body.answer.trim() : "";
   if (!answer) return refuse("Say something first.", 400);
+  const inTime =
+    typeof body?.claimId === "string" &&
+    typeof body.startedAt === "number" &&
+    typeof body.token === "string" &&
+    (await withinClock(body.claimId, body.startedAt, body.token));
+  if (!inTime) return refuse("Time ran out. Start again and answer inside twenty seconds.", 400);
   if (answer.length > MAX_CHARS) return refuse("That is longer than twenty seconds of talking.", 400);
   const address = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
   if (!allow(address)) return refuse("You have used this a lot in the last hour. Try again soon.", 429);

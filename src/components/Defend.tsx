@@ -14,6 +14,7 @@ export function Defend({ reportId, claimId, repo }: { reportId: string; claimId:
   const [result, setResult] = useState<CheckedClaim | null>(null);
   const [error, setError] = useState("");
   const box = useRef<HTMLTextAreaElement>(null);
+  const clock = useRef<{ startedAt: number; token: string } | null>(null);
   const latest = useRef(answer);
   latest.current = answer;
 
@@ -29,7 +30,7 @@ export function Defend({ reportId, claimId, repo }: { reportId: string; claimId:
       const res = await fetch("/api/defend", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: reportId, claimId, answer: text }),
+        body: JSON.stringify({ id: reportId, claimId, answer: text, ...clock.current }),
       });
       const body = (await res.json()) as { claim?: CheckedClaim; message?: string };
       if (!res.ok || !body.claim) throw new Error(body.message ?? "The check stopped.");
@@ -58,7 +59,17 @@ export function Defend({ reportId, claimId, repo }: { reportId: string; claimId:
         <button
           type="button"
           className="btn btn-outline btn-sm"
-          onClick={() => {
+          onClick={async () => {
+            const res = await fetch("/api/defend", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ start: true, claimId }),
+            }).catch(() => null);
+            if (!res?.ok) {
+              setError("The clock could not start. Try again.");
+              return;
+            }
+            clock.current = (await res.json()) as { startedAt: number; token: string };
             setLeft(SECONDS);
             setAnswer("");
             setError("");

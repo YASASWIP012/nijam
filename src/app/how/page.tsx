@@ -35,6 +35,13 @@ export default function How() {
           search. Treat a verdict as a starting point for review.
         </p>
         <p>Your pitch and excerpts of the repo go to a third-party language model on a free plan, and the provider may use them to improve its products. Use public repos only, and keep private details out of what you say.</p>
+        <h2>How it was tested</h2>
+        <p>
+          On a planted repo with 11 hand-labelled claims, the latest run got 9 right. It skipped one claim and left one real
+          feature not settled. The rules overruled the model once, on a speed number it called missing. Scores move between
+          runs: earlier ones were 9 of 10 and 8 of 11. The repo and the labels are in <span className="t-mono">eval/labelled.ts</span>.
+        </p>
+        <p>The free plan covers a handful of checks a day. When they run out, the real reports stay open.</p>
         <h2>Receipts</h2>
         <p>
           A receipt is a SHA-256 hash of the commit, the text and the verdicts, signed with Ed25519. It shows that Nijam

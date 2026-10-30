@@ -30,7 +30,7 @@ export default function How() {
           code is ever called, so dead code can pass. The model sees up to twelve excerpts for each claim, chosen by
           search. Treat a verdict as a starting point for review.
         </p>
-        <p>Your pitch and excerpts of the repo go to a third-party language model. Use public repos only.</p>
+        <p>Your pitch and excerpts of the repo go to a third-party language model on a free plan, and the provider may use them to improve its products. Use public repos only, and keep private details out of what you say.</p>
         <h2>Receipts</h2>
         <p>
           A receipt is a SHA-256 hash of the commit, the text and the verdicts, signed with Ed25519. It shows that Nijam

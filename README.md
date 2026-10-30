@@ -43,4 +43,4 @@ npm test
 npm run dev
 ```
 
-Set `LLM_API_KEY`, `LLM_MODEL`, `GITHUB_TOKEN` and `RECEIPT_KEY` in `.env.local`. `npm run eval` scores the checker on a planted repo with hand-labelled answers in `eval/labelled.ts`.
+Set `LLM_PROVIDER`, `LLM_API_KEY`, `LLM_MODEL`, `GITHUB_TOKEN` and `RECEIPT_KEY` in `.env.local`. `LLM_PROVIDER=gemini` uses Gemini; any other value uses Anthropic. `npm run eval` scores the checker on a planted repo with hand-labelled answers in `eval/labelled.ts`.

@@ -18,7 +18,7 @@ import {
 const MAX_CLAIMS = 10;
 const MAX_INSTRUCTIONS = 20;
 const CHUNKS_PER_CLAIM = 12;
-const CONCURRENCY = 4;
+const CONCURRENCY = 2;
 
 export interface RunInput {
   pitch: string;

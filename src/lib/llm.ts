@@ -18,6 +18,7 @@ export class LlmError extends Error {}
 const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/interactions";
 const MAX_OUTPUT_TOKENS = 16000;
 const GEMINI_RETRIES = 5;
+const GEMINI_TIMEOUT_MS = 45_000;
 
 interface GeminiStep {
   type: string;
@@ -36,24 +37,36 @@ export function geminiText(body: { status?: string; steps?: GeminiStep[] }): str
 
 export function geminiLlm(
   apiKey: string,
-  model: string,
+  models: string[],
   { send = fetch, wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms)) } = {},
 ): Llm {
-  async function call(body: string, attempt = 0): Promise<Response> {
-    const res = await send(GEMINI_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body,
-    });
-    if ((res.status !== 429 && res.status !== 503) || attempt >= GEMINI_RETRIES) return res;
-    await wait(2 ** (attempt + 1) * 1000 + Math.random() * 500);
-    return call(body, attempt + 1);
+  /** A busy or rate-limited model hands over to the next one, so one overloaded model cannot stall a report. */
+  async function call(body: (model: string) => string): Promise<Response | null> {
+    let last: Response | null = null;
+    for (let attempt = 0; attempt <= GEMINI_RETRIES; attempt += 1) {
+      if (attempt > 0) await wait(2 ** attempt * 500 + Math.random() * 500);
+      const model = models[attempt % models.length] as string;
+      try {
+        last = await send(GEMINI_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+          body: body(model),
+          signal: AbortSignal.timeout(GEMINI_TIMEOUT_MS),
+        });
+      } catch (error) {
+        if (!(error instanceof Error) || error.name !== "TimeoutError") throw error;
+        last = null;
+        continue;
+      }
+      if (last.status !== 429 && last.status !== 503) return last;
+    }
+    return last;
   }
 
   return {
     async json({ system, user, schema, effort = "medium" }) {
       const { $schema: _, ...jsonSchema } = z.toJSONSchema(schema);
-      const res = await call(
+      const res = await call((model) =>
         JSON.stringify({
           model,
           system_instruction: system,
@@ -63,6 +76,7 @@ export function geminiLlm(
           response_format: { type: "text", mime_type: "application/json", schema: jsonSchema },
         }),
       );
+      if (res === null) throw new LlmError("The model took too long. Try again in a minute.");
       if (res.status === 429) throw new LlmError("The checker has used its free quota for now. Try again later.");
       if (res.status === 503) throw new LlmError("The model is overloaded. Try again in a minute.");
       if (!res.ok) throw new LlmError(`The model answered ${res.status}.`);
@@ -106,7 +120,8 @@ function anthropicLlm(apiKey: string, model: string): Llm {
 
 export function liveLlm(): Llm {
   const apiKey = process.env.LLM_API_KEY;
-  const model = process.env.LLM_MODEL;
-  if (!apiKey || !model) throw new LlmError("The checker is not configured yet.");
-  return process.env.LLM_PROVIDER === "gemini" ? geminiLlm(apiKey, model) : anthropicLlm(apiKey, model);
+  const models = process.env.LLM_MODEL?.split(",").map((name) => name.trim()).filter(Boolean) ?? [];
+  const [first] = models;
+  if (!apiKey || !first) throw new LlmError("The checker is not configured yet.");
+  return process.env.LLM_PROVIDER === "gemini" ? geminiLlm(apiKey, models) : anthropicLlm(apiKey, first);
 }

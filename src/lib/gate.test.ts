@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { absenceHolds, applyGate, checkTestCount, confirmCitation, hasLiveCode, locateSaid } from "./gate";
+import { absenceHolds, applyGate, checkTestCount, confirmCitation, hasLiveCode, locateSaid, numbersInCode } from "./gate";
 import type { Claim, Coverage, RawVerdict } from "./types";
 
 const files = new Map([
@@ -127,6 +127,34 @@ describe("applyGate", () => {
   it("drops the rewrite for an implemented claim", () => {
     const result = applyGate(claim, raw({ citations: [realCode], sayInstead: "unused" }), ctx);
     expect(result.sayInstead).toBeUndefined();
+  });
+});
+
+describe("numbersInCode", () => {
+  const metric: Claim = { ...claim, kind: "metric", claim: "Shrinks 410,977 rows to 1.09 GB" };
+  const cite = (quote: string) => [{ path: "src/a.ts", startLine: 1, endLine: 1, quote }];
+
+  it("overrules a measured number the code does not hold", () => {
+    const code = new Map([["src/a.ts", "export const shrink = (rows) => rows.map(compact);\n"]]);
+    const result = applyGate(
+      metric,
+      raw({ citations: cite("export const shrink = (rows) => rows.map(compact);") }),
+      { files: code, coverage: complete },
+    );
+    expect(result.verdict).toBe("unclear");
+    expect(result.overruled?.from).toBe("implemented");
+  });
+
+  it("accepts a number that is in the code", () => {
+    expect(numbersInCode(metric, cite("const ROWS = 410977; const SIZE_GB = 1.09;"))).toBe(true);
+  });
+
+  it("does not match a number inside a longer one", () => {
+    expect(numbersInCode({ ...metric, claim: "Handles 40 rows" }, cite("const MAX = 1400;"))).toBe(false);
+  });
+
+  it("leaves claims of other kinds alone", () => {
+    expect(numbersInCode({ ...metric, kind: "feature" }, cite("nothing here"))).toBe(true);
   });
 });
 

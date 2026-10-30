@@ -78,6 +78,7 @@ export const CASES: { said: string; label: Verdict }[] = [
   { said: "it syncs offline and resolves conflicts", label: "missing" },
   { said: "it sends WhatsApp reminders for overdue bills", label: "missing" },
   { said: "there is a multi-tenant admin dashboard", label: "missing" },
+  { said: "invoice totals are computed in 3 milliseconds", label: "unclear" },
 ];
 
 export const PITCH = CASES.map((item) => `${item.said[0]?.toUpperCase()}${item.said.slice(1)}.`).join(" ");

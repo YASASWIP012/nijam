@@ -81,6 +81,15 @@ export function checkTestCount(claim: Claim, facts: RepoFacts): CheckedClaim | n
   };
 }
 
+/** A measured number needs to appear in the code cited. Code that could measure it proves nothing about the result. */
+export function numbersInCode(claim: Claim, cited: Citation[]): boolean {
+  if (claim.kind !== "metric") return true;
+  const plain = (text: string) => text.replaceAll(",", "");
+  const numbers = plain(claim.claim).match(/\d+(?:\.\d+)?/g) ?? [];
+  const code = plain(cited.map((item) => item.quote).join("\n"));
+  return numbers.every((number) => new RegExp(`(^|[^\\d.])${number.replace(".", "\\.")}(?![\\d])`).test(code));
+}
+
 export interface GateContext {
   files: Map<string, string>;
   coverage: Coverage;
@@ -103,6 +112,9 @@ export function applyGate(claim: Claim, raw: RawVerdict, ctx: GateContext): Chec
     why = citations.length
       ? "The lines cited are docs, tests, comments or imports, and a claim of working code needs running code."
       : "No cited line exists in the repo at this commit.";
+  } else if (raw.verdict === "implemented" && !numbersInCode(claim, inCode)) {
+    verdict = "unclear";
+    why = "The cited code does not contain this number, so it cannot show the number was measured.";
   } else if (raw.verdict === "simulated" && inCode.length === 0) {
     verdict = "unclear";
     why = "The fake path it pointed to could not be found in source files.";

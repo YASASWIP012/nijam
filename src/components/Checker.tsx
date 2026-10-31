@@ -13,6 +13,7 @@ const STAGES = [
   ["checking", "Checking each one"],
   ["done", "Done"],
 ] as const;
+const REPLAY_MS = 700;
 
 export function Checker() {
   const [mode, setMode] = useState<"spoken" | "instructions">("spoken");
@@ -90,6 +91,26 @@ export function Checker() {
     setPitch(sample.pitch);
   }
 
+  /** Replays a stored report claim by claim. It uses no model calls, so it works when the free checks run out. */
+  function replay() {
+    const sample = SAMPLES[0];
+    if (!sample) return;
+    setError("");
+    setReport(null);
+    setChecked([]);
+    setPending(sample.claims);
+    setCheckedRepo(sample.repo);
+    setStage("checking");
+    setDetail(`Replay of a stored report on ${sample.repo.name}. This uses none of today's checks.`);
+    sample.claims.forEach((claim, index) => {
+      window.setTimeout(() => setChecked((done) => [...done, claim]), (index + 1) * REPLAY_MS);
+    });
+    window.setTimeout(() => {
+      setStage("done");
+      setReport(sample);
+    }, (sample.claims.length + 1) * REPLAY_MS);
+  }
+
   function sayItAgain() {
     if (report) setPitch(honestPitch(report));
     setStage(null);
@@ -146,6 +167,10 @@ export function Checker() {
                 {" "}
                 <button type="button" className="linklike" onClick={loadExample}>
                   Load an example
+                </button>{" "}
+                or{" "}
+                <button type="button" className="linklike" onClick={replay}>
+                  watch a real check
                 </button>
               </>
             )}
@@ -166,6 +191,14 @@ export function Checker() {
         {detail && <p className="status" style={{ marginTop: 10 }}>{detail}</p>}
         <p className="status status--error" role="alert" style={{ marginTop: error ? 10 : 0 }}>
           {error}
+          {error && SAMPLES[0] && (
+            <>
+              {" "}
+              <button type="button" className="linklike" onClick={replay}>
+                Watch a real check instead
+              </button>
+            </>
+          )}
         </p>
       </form>
       <div ref={results} aria-live="polite" style={{ marginTop: 24 }}>

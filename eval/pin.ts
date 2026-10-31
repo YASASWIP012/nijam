@@ -2,14 +2,14 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { list } from "@vercel/blob";
 import { onlySaid } from "@/lib/gate";
 import { loadRepo } from "@/lib/github";
-import type { Report } from "@/lib/types";
+import type { CheckedClaim, Report } from "@/lib/types";
 
 const id = process.argv[2];
 const { blobs } = await list({ prefix: `reports/${id}.json`, limit: 1 });
 if (!blobs[0]) throw new Error("no such report");
 const report = (await (await fetch(blobs[0].url)).json()) as Report;
 const { snapshot } = await loadRepo(`github.com/${report.repo.owner}/${report.repo.name}`, report.repo.sha);
-const claims = report.claims.map(({ onlySaid: _, ...claim }) =>
+const claims = report.claims.map(({ onlySaid: _, ...claim }: CheckedClaim) =>
   onlySaid(claim, snapshot.files) ? { ...claim, onlySaid: true } : claim,
 );
 const path = "src/data/samples.json";

@@ -31,6 +31,11 @@ export default function Home() {
               <span className="eyebrow">Real reports</span>
               <h2>Run on real projects.</h2>
               <p className="lead">Each report is pinned to a commit, so you can open the same lines we read.</p>
+              <p className="lead" style={{ marginTop: 10 }}>
+                In the first real spoken pitch, Flow heard “rebuild the root” as “build the route”. Nijam marked the line
+                as not in the repo and named the likely mishearing.{" "}
+                <a href="/r/69d54157d5eb07">Open that report</a>.
+              </p>
             </div>
             <div className="grid grid-3">
               {SAMPLES.map((report) => (

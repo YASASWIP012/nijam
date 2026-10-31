@@ -2,6 +2,296 @@
   {
     "repo": {
       "owner": "YASASWIP012",
+      "name": "check-the-receipt",
+      "sha": "5066b56d9909294ea79cc532aed6e2a84eefbd23"
+    },
+    "pitch": "Check - the - receipt is about Trace, the Data Foundation's registry for AI training data. Trace has more than 250 million receipts, and each one says where a file came from, which app collected it, and which terms the contributor accepted. The problem is that you are asked to trust those receipts, so I built a page where anyone can check one from the outside using only public data. The hash and signature checks run right in your browser.\n\nI also ran an audit on October 28. A script picked 1,000 random receipts and ran all three checks on each one. Nine didn't build the route, and those were all unsigned Numo receipts, so the page says it can't check them yet. It doesn't call them changed.",
+    "claims": [
+      {
+        "said": "Trace has more than 250 million receipts,",
+        "claim": "The Trace data foundation registry contains more than 250 million individual receipts.",
+        "kind": "metric",
+        "terms": [
+          "receipts_count",
+          "database_size",
+          "trace_registry"
+        ],
+        "id": "c1",
+        "verdict": "unclear",
+        "reason": "The repository contains no code or data verifying the total count of receipts in the Trace registry, only a UI translation string mentioning the number.",
+        "citations": [],
+        "sayInstead": "The repository does not track or verify the total number of receipts in the Trace registry.",
+        "overruled": {
+          "from": "missing",
+          "why": "Reading code cannot show that a number is false, only that nothing here proves it."
+        }
+      },
+      {
+        "said": "A script picked 1,000 random receipts and ran all three checks on each one.",
+        "claim": "An automated script samples 1,000 random receipts and executes three distinct validation checks on them.",
+        "kind": "quality",
+        "terms": [
+          "audit_script",
+          "random_sample",
+          "verification_checks",
+          "1000"
+        ],
+        "id": "c2",
+        "verdict": "implemented",
+        "reason": "The audit script in scripts/audit.ts is designed to sample a configurable number of receipts (defaulting to 1,000) using a seedable random number generator. It then performs three specific validation checks—verifying field hashes, provider signatures, and blockchain anchoring—on every sampled receipt, aggregating the results into a report.",
+        "citations": [
+          {
+            "path": "scripts/audit.ts",
+            "startLine": 22,
+            "endLine": 23,
+            "quote": "const N = arg(\"n\", 1000);\nconst SEED = arg(\"seed\", 20261028);"
+          },
+          {
+            "path": "scripts/audit.ts",
+            "startLine": 131,
+            "endLine": 133,
+            "quote": "  while (picked.size < N) {\n    const want = Math.min(N - picked.size, 200);\n    const orders = Array.from({ length: want }, () => lo + Math.floor(random() * (hi - lo)));"
+          },
+          {
+            "path": "scripts/audit.ts",
+            "startLine": 194,
+            "endLine": 196,
+            "quote": "      fields: (await checkFieldsUnchanged(receipt)).status,\n      signature: (await checkSignature(receipt, jwks)).status,\n      anchored: anchored.status,"
+          },
+          {
+            "path": "scripts/audit.ts",
+            "startLine": 10,
+            "endLine": 10,
+            "quote": "import { checkAnchored, checkFieldsUnchanged, checkSignature } from \"../src/lib/checks\";"
+          }
+        ]
+      },
+      {
+        "said": "The hash and signature checks run right in your browser.",
+        "claim": "The application performs hash and cryptographic signature verification client-side within the web browser.",
+        "kind": "feature",
+        "terms": [
+          "hash",
+          "signature",
+          "browser",
+          "validation",
+          "crypto"
+        ],
+        "id": "c3",
+        "verdict": "implemented",
+        "reason": "The application uses the browser's native Web Crypto API (crypto.subtle) to perform SHA-256 hashing and ECDSA signature verification directly on the client side.",
+        "citations": [
+          {
+            "path": "src/lib/hash.ts",
+            "startLine": 22,
+            "endLine": 25,
+            "quote": "export async function sha256Hex(data: string | ArrayBuffer | Uint8Array): Promise<string> {\n  const input = typeof data === \"string\" ? new TextEncoder().encode(data) : data;\n  return toHex(await crypto.subtle.digest(\"SHA-256\", input as BufferSource));\n}"
+          },
+          {
+            "path": "src/lib/checks.ts",
+            "startLine": 9,
+            "endLine": 9,
+            "quote": "  const computed = await sha256Hex(canonicalJson(signedFields));"
+          },
+          {
+            "path": "src/lib/checks.ts",
+            "startLine": 44,
+            "endLine": 50,
+            "quote": "  const key = await crypto.subtle.importKey(\n    \"jwk\",\n    { kty: jwk.kty, crv: jwk.crv, x: jwk.x, y: jwk.y, ext: true },\n    { name: \"ECDSA\", namedCurve: \"P-256\" },\n    false,\n    [\"verify\"],\n  );"
+          },
+          {
+            "path": "src/lib/checks.ts",
+            "startLine": 53,
+            "endLine": 58,
+            "quote": "  const ok = await crypto.subtle.verify(\n    { name: \"ECDSA\", hash: \"SHA-256\" },\n    key,\n    sig as BufferSource,\n    new TextEncoder().encode(att.payload_hash),\n  );"
+          }
+        ]
+      },
+      {
+        "said": "each one says where a file came from, which app collected it, and which terms the contributor accepted.",
+        "claim": "Each receipt includes metadata for file source, the collecting application, and the accepted contributor terms.",
+        "kind": "data",
+        "terms": [
+          "source",
+          "app_id",
+          "terms_accepted",
+          "metadata"
+        ],
+        "id": "c4",
+        "verdict": "implemented",
+        "reason": "The ReceiptMetadata type defines fields for the collecting application (app), contributor consent (tos_version, privacy_policy_version), and file capture details (captured_via). The ReceiptPaper component extracts and displays these specific fields for every receipt.",
+        "citations": [
+          {
+            "path": "src/lib/types.ts",
+            "startLine": 10,
+            "endLine": 34,
+            "quote": "export interface ReceiptMetadata {\n  app?: { legal_entity?: string; platform_name?: string };\n  attestation?: Attestation;\n  contributor?: {\n    account_verification_status?: string;\n    anon_id?: string;\n    kyc_status?: string;\n    kyc_country?: string;\n    geo_region?: string;\n    consent?: {\n      tos_version?: string;\n      tos_uri?: string;\n      tos_hash?: string;\n      privacy_policy_version?: string;\n      privacy_policy_uri?: string;\n      privacy_policy_hash?: string;\n    };\n  };\n  file?: {\n    media_category?: string;\n    mime_type?: string;\n    size_bytes?: number;\n    content_sha256?: string;\n    behavior?: { captured_via?: string; client_version?: string };\n  };"
+          },
+          {
+            "path": "src/components/ReceiptPaper.tsx",
+            "startLine": 73,
+            "endLine": 73,
+            "quote": "<div className=\"mt-1 text-[11px] tracking-widest text-[#6b6760]\">{t.lines.receipt} · {fill(t.lines.via, { app })}</div>"
+          },
+          {
+            "path": "src/components/ReceiptPaper.tsx",
+            "startLine": 81,
+            "endLine": 84,
+            "quote": "<Row label={t.lines.captured} value={`${day(m.timestamps?.captured_at)} · ${m.file?.behavior?.captured_via?.replace(/_/g, \" \") ?? \"\"}`} state={s1} />\n      <Row label={t.lines.contributor} value={fill(t.lines.kyc, { status: c?.kyc_status ?? \"–\", country: c?.kyc_country ?? \"–\" })} state={s1} />\n      <Row label={t.lines.tos} value={version(c?.consent?.tos_version)} state={s1} />\n      <Row label={t.lines.pp} value={version(c?.consent?.privacy_policy_version)} state={s1} />"
+          }
+        ]
+      },
+      {
+        "said": "a page where anyone can check one from the outside using only public data.",
+        "claim": "The system provides a public web interface for verifying receipts using only publicly available data.",
+        "kind": "feature",
+        "terms": [
+          "public_verify",
+          "check_receipt",
+          "external_audit"
+        ],
+        "id": "c5",
+        "verdict": "implemented",
+        "reason": "The system includes a React-based web interface that allows users to input a receipt ID and runs three verification checks (fields integrity, provider signature, and blockchain anchoring) using data fetched from public APIs like Trace and the DATA Network explorer.",
+        "citations": [
+          {
+            "path": "src/app/page.tsx",
+            "startLine": 7,
+            "endLine": 12,
+            "quote": "export default async function Home({ searchParams }: PageProps<\"/\">) {\n  const params = await searchParams;\n  const id = typeof params.id === \"string\" && UUID_RE.test(params.id) ? params.id.toLowerCase() : featured.data_id;\n  const lang = params.lang === \"ko\" ? \"ko\" : \"en\";\n  return <Checker key={id} initialId={id} initialLang={lang} repoUrl={REPO_URL} />;\n}"
+          },
+          {
+            "path": "src/components/Checker.tsx",
+            "startLine": 47,
+            "endLine": 53,
+            "quote": "  const check = useCallback(async (id: string) => {\n    const run = ++runId.current;\n    setLoading(true);\n    setError(\"\");\n    setStatus([\"idle\", \"idle\", \"idle\", \"idle\"]);\n    setResults([null, null, null, null]);\n    const b = await loadBundle(id);"
+          },
+          {
+            "path": "src/lib/checks.ts",
+            "startLine": 6,
+            "endLine": 6,
+            "quote": "export async function checkFieldsUnchanged(receipt: TraceReceipt): Promise<CheckResult> {"
+          },
+          {
+            "path": "src/lib/checks.ts",
+            "startLine": 28,
+            "endLine": 28,
+            "quote": "export async function checkSignature(receipt: TraceReceipt, jwks: { keys: Jwk[] } | null): Promise<CheckResult> {"
+          },
+          {
+            "path": "src/lib/checks.ts",
+            "startLine": 63,
+            "endLine": 63,
+            "quote": "export function checkAnchored(receipt: TraceReceipt, tx: AnchorTx | null): CheckResult {"
+          }
+        ]
+      },
+      {
+        "said": "the page says it can't check them yet. It doesn't call them changed.",
+        "claim": "The user interface distinguishes between receipts that cannot be verified and those that have been modified.",
+        "kind": "feature",
+        "terms": [
+          "status_uncheckable",
+          "status_changed",
+          "validation_state"
+        ],
+        "id": "c6",
+        "verdict": "implemented",
+        "reason": "The verification logic explicitly separates receipts that cannot be checked or reproduced (returning \"unavailable\") from those where signed fields were modified (returning \"mismatch\"), and the interface provides distinct messages for each status.",
+        "citations": [
+          {
+            "path": "src/lib/checks.ts",
+            "startLine": 18,
+            "endLine": 24,
+            "quote": "  if (!root) return { status: \"unavailable\", evidence };\n  if (computed === root && (!signed || signed === root)) return { status: \"pass\", evidence };\n  // A signed root pins the exact bytes, so a difference means the fields changed.\n  // Without a signature we can't know how the app built its root, so we only\n  // report that the public fields don't rebuild it.\n  if (!attestation) return { status: \"unavailable\", evidence: { ...evidence, note: \"not reproducible from the public fields\" } };\n  return { status: \"mismatch\", evidence };"
+          }
+        ]
+      },
+      {
+        "said": "Nine didn't build the route, and those were all unsigned Numo receipts,",
+        "claim": "The validation logic identifies unsigned receipts from the Numo application as unroutable.",
+        "kind": "data",
+        "terms": [
+          "Numo",
+          "unsigned",
+          "route_failure"
+        ],
+        "id": "c7",
+        "verdict": "missing",
+        "reason": "The claim appears to be based on a phonetic misinterpretation of the project's documentation. The project identifies certain Numo receipts as having an 'unreproducible metadata root' (meaning the cryptographic hash cannot be recalculated from the fields), but it does not use the term 'unroutable' or perform any validation related to network or data routing. The source code for the validation logic itself is not included in the excerpts, only the UI components that display the results.",
+        "citations": [
+          {
+            "path": "README.md",
+            "startLine": 36,
+            "endLine": 36,
+            "quote": "The nine receipts whose fields didn't rebuild the root are all unsigned Numo receipts from the Numo Mobile and Poseidon Season 1 clients."
+          }
+        ],
+        "sayInstead": "The validation logic identifies certain Numo receipts as having an unreproducible metadata root, but it does not classify them as unroutable."
+      },
+      {
+        "said": "I also ran an audit on October 28.",
+        "claim": "The project includes audit results or logs generated on October 28th.",
+        "kind": "quality",
+        "terms": [
+          "audit_date",
+          "2024-10-28",
+          "audit_report"
+        ],
+        "id": "c8",
+        "verdict": "unclear",
+        "reason": "The repository contains a markdown file documenting an audit run, which includes a timestamp from October 28, 2026.",
+        "citations": [
+          {
+            "path": "results/audit-20261028.md",
+            "startLine": 1,
+            "endLine": 3,
+            "quote": "# Trace receipt audit, seed 20261028\n\nRun at 2026-10-28T15:16:28.797Z. 1000 receipts drawn at random from Trace activity positions 100000419 to 581807712."
+          }
+        ],
+        "overruled": {
+          "from": "implemented",
+          "why": "The lines cited are docs, tests, comments or imports, and a claim of working code needs running code."
+        },
+        "onlySaid": true
+      }
+    ],
+    "id": "69d54157d5eb07",
+    "pitchSource": "spoken",
+    "createdAt": "2026-10-31T07:06:29.249Z",
+    "coverage": {
+      "totalFiles": 53,
+      "readFiles": 45,
+      "bytes": 129908,
+      "skipped": {
+        "lockfile or minified": 1,
+        "binary": 6,
+        "over file size cap": 1
+      },
+      "complete": true
+    },
+    "facts": {
+      "sourceFiles": 25,
+      "sourceLines": 1732,
+      "testFiles": 10,
+      "testCases": 17
+    },
+    "dropped": {
+      "notInPitch": 0,
+      "overCap": 0
+    },
+    "counts": {
+      "implemented": 5,
+      "simulated": 0,
+      "missing": 1,
+      "unclear": 2
+    },
+    "receipt": "e95d92ce637b2493604ac0bdd6ba29624d87079eec848aac4fd84e71375e577d",
+    "signature": "Q5kyZ0AZkxmUaizpdE068VX2lMjnp4tKelg7fU20/Ji8cgWEPEvlo4GbIvV1PI7coYby0XxUcF+sr1OkgSpGBQ=="
+  },
+  {
+    "repo": {
+      "owner": "YASASWIP012",
       "name": "blindfetch",
       "sha": "66f1c9a81760a66cdd01fb31033b91fc05e35f66"
     },

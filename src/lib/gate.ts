@@ -66,7 +66,7 @@ function matchedTerms(terms: string[], text: string): number {
 /** True for a claim the README never makes: the speaker only said it out loud. */
 export function onlySaid(claim: Claim, files: Map<string, string>): boolean {
   const readme = [...files].find(([path]) => /^readme\.[a-z]+$/i.test(path))?.[1];
-  const terms = stems(claim);
+  const terms = stems({ ...claim, terms: [...claim.terms, claim.said] });
   if (readme === undefined || terms.length === 0) return false;
   return matchedTerms(terms, readme) < termsNeeded(terms);
 }

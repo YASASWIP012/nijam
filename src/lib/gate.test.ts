@@ -168,11 +168,15 @@ describe("onlySaid", () => {
   const readme = new Map([["README.md", "Charges real cards through the payment provider.\n"]]);
 
   it("flags a claim the README never makes", () => {
-    expect(onlySaid({ ...claim, terms: ["whatsapp", "reminder"] }, readme)).toBe(true);
+    expect(onlySaid({ ...claim, said: "sends whatsapp reminders", terms: ["whatsapp", "reminder"] }, readme)).toBe(true);
   });
 
   it("does not flag one it makes", () => {
     expect(onlySaid({ ...claim, terms: ["charges", "cards"] }, readme)).toBe(false);
+  });
+
+  it("counts the spoken words as well as the search terms", () => {
+    expect(onlySaid({ ...claim, said: "charges real cards through payment", terms: ["ledger"] }, readme)).toBe(false);
   });
 
   it("says nothing when there is no README", () => {

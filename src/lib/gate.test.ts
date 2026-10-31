@@ -155,6 +155,12 @@ describe("numbersInCode", () => {
     expect(result.verdict).toBe("unclear");
   });
 
+  it("refuses the right digits on an unrelated line", () => {
+    const related = { ...metric, claim: "Handles 40 invoices", terms: ["invoices"] };
+    expect(numbersInCode(related, cite("const TIMEOUT_SECONDS = 40;"))).toBe(false);
+    expect(numbersInCode(related, cite("const MAX_INVOICES = 40;"))).toBe(true);
+  });
+
   it("does not match a number inside a longer one", () => {
     expect(numbersInCode({ ...metric, claim: "Handles 40 rows" }, cite("const MAX = 1400;"))).toBe(false);
   });

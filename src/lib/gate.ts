@@ -101,13 +101,17 @@ export function checkTestCount(claim: Claim, facts: RepoFacts): CheckedClaim | n
   };
 }
 
-/** A measured number needs to appear in the code cited. Code that could measure it proves nothing about the result. */
+/** A measured number needs to appear in the code cited, on a line about the claim. An unrelated constant proves nothing. */
 export function numbersInCode(claim: Claim, cited: Citation[]): boolean {
   if (claim.kind !== "metric") return true;
   const plain = (text: string) => text.replaceAll(",", "");
   const numbers = plain(claim.claim).match(/\d+(?:\.\d+)?/g) ?? [];
-  const code = plain(cited.map((item) => item.quote).join("\n"));
-  return numbers.every((number) => new RegExp(`(^|[^\\d.])${number.replace(".", "\\.")}(?![\\d])`).test(code));
+  const lines = plain(cited.map((item) => item.quote).join("\n")).split("\n");
+  const terms = stems(claim);
+  return numbers.every((number) => {
+    const exact = new RegExp(`(^|[^\\d.])${number.replace(".", "\\.")}(?![\\d])`);
+    return lines.some((line) => exact.test(line) && (terms.length === 0 || matchedTerms(terms, line) > 0));
+  });
 }
 
 /** A rewrite has to stay in the speaker's language. Script letters the speaker never used mean the model drifted. */

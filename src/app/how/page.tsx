@@ -15,7 +15,7 @@ export default function How() {
           <li>A claim only exists if its words are in what you said.</li>
           <li>A citation only counts if the quoted lines are in the file at that commit.</li>
           <li>Backed by code needs lines in a source file. READMEs and tests do not count.</li>
-          <li>A measured number has to appear in the code cited. If it does not, the claim stays not settled, because code cannot show a number was measured.</li>
+          <li>A measured number has to appear in the code cited. If it does not, the claim stays not settled, because code cannot show a number was measured. The match is only on the digits, so an unrelated constant can pass.</li>
           <li>A number is never marked as not in the repo. Reading code cannot show a number is false.</li>
           <li>Simulated also needs source lines, showing the fake path.</li>
           <li>A claim is flagged as not in the README when most of its search terms are missing from it. The flag cannot tell speech from typing.</li>
